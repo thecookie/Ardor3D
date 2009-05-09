@@ -28,7 +28,7 @@ import com.ardor3d.renderer.state.MaterialState;
 import com.ardor3d.renderer.state.TextureState;
 import com.ardor3d.scenegraph.Mesh;
 import com.ardor3d.scenegraph.Node;
-import com.ardor3d.scenegraph.Spatial.LightCombineMode;
+import com.ardor3d.scenegraph.hint.LightCombineMode;
 import com.ardor3d.scenegraph.shape.Sphere;
 import com.ardor3d.ui.text.BasicText;
 import com.ardor3d.util.ReadOnlyTimer;
@@ -78,8 +78,8 @@ public class ManyCollisionsExample extends ExampleBase {
         _canvas.setTitle("TestSharedMesh");
 
         t = BasicText.createDefaultTextLabel("Text", "");
-        t.setRenderBucketType(RenderBucketType.Ortho);
-        t.setLightCombineMode(LightCombineMode.Off);
+        t.getSceneHints().setRenderBucketType(RenderBucketType.Ortho);
+        t.getSceneHints().setLightCombineMode(LightCombineMode.Off);
         t.setTranslation(new Vector3(0, 20, 0));
         _root.attachChild(t);
 

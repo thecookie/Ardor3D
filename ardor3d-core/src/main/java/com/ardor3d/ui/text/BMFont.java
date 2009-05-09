@@ -447,9 +447,9 @@ public class BMFont {
             spatial.setRenderState(blendState);
             spatial.setRenderState(zBuffState);
             if (_useBlend) {
-                spatial.setRenderBucketType(RenderBucketType.Transparent);
+                spatial.getSceneHints().setRenderBucketType(RenderBucketType.Transparent);
             } else {
-                spatial.setRenderBucketType(RenderBucketType.Opaque);
+                spatial.getSceneHints().setRenderBucketType(RenderBucketType.Opaque);
             }
         }
 

@@ -59,7 +59,7 @@ public class ShadowVolume extends Mesh {
         setVBOInfo(new VBOInfo(false));
 
         // It will not use the renderqueue, so turn that off:
-        setRenderBucketType(RenderBucketType.Skip);
+        getSceneHints().setRenderBucketType(RenderBucketType.Skip);
 
         final MaterialState ms = new MaterialState();
         ms.setAmbient(new ColorRGBA(0.5f, 0.7f, 0.7f, 0.2f));

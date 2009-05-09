@@ -37,8 +37,8 @@ import com.ardor3d.renderer.state.MaterialState.ColorMaterial;
 import com.ardor3d.scenegraph.Line;
 import com.ardor3d.scenegraph.Mesh;
 import com.ardor3d.scenegraph.Spatial;
-import com.ardor3d.scenegraph.Spatial.CullHint;
-import com.ardor3d.scenegraph.Spatial.LightCombineMode;
+import com.ardor3d.scenegraph.hint.CullHint;
+import com.ardor3d.scenegraph.hint.LightCombineMode;
 import com.ardor3d.scenegraph.shape.Arrow;
 import com.ardor3d.scenegraph.shape.AxisRods;
 import com.ardor3d.scenegraph.shape.Box;
@@ -133,7 +133,7 @@ public class ShapesExample extends ExampleBase {
         // Set up our pick label
         _text = BasicText.createDefaultTextLabel("", "pick");
         _text.setTranslation(10, 10, 0);
-        _text.setCullHint(CullHint.Always);
+        _text.getSceneHints().setCullHint(CullHint.Always);
         _root.attachChild(_text);
     }
 
@@ -159,7 +159,7 @@ public class ShapesExample extends ExampleBase {
 
                 if (_pickResults.getNumber() > 0) {
                     // picked something, show label.
-                    _text.setCullHint(CullHint.Never);
+                    _text.getSceneHints().setCullHint(CullHint.Never);
 
                     // set our text to the name of the ancestor of this object that is right under the _root node.
                     final PickData pick = _pickResults.getPickData(0);
@@ -167,7 +167,7 @@ public class ShapesExample extends ExampleBase {
                     _text.setText(topLevel.getName());
                 } else {
                     // No pick, clear label.
-                    _text.setCullHint(CullHint.Always);
+                    _text.getSceneHints().setCullHint(CullHint.Always);
                     _text.setText("");
                 }
             }
@@ -191,7 +191,7 @@ public class ShapesExample extends ExampleBase {
         final Line line = new Line("Lines", verts, null, null, null);
         line.getMeshData().setIndexMode(IndexMode.LineStrip);
         line.setLineWidth(2);
-        line.setLightCombineMode(LightCombineMode.Off);
+        line.getSceneHints().setLightCombineMode(LightCombineMode.Off);
 
         return line;
     }

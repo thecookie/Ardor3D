@@ -23,7 +23,6 @@ import com.ardor3d.math.ColorRGBA;
 import com.ardor3d.math.MathUtils;
 import com.ardor3d.math.Vector3;
 import com.ardor3d.math.type.ReadOnlyColorRGBA;
-import com.ardor3d.renderer.NormalsMode;
 import com.ardor3d.renderer.Renderer;
 import com.ardor3d.renderer.state.GLSLShaderObjectsState;
 import com.ardor3d.renderer.state.LightState;
@@ -31,6 +30,7 @@ import com.ardor3d.renderer.state.LightUtil;
 import com.ardor3d.renderer.state.RenderState;
 import com.ardor3d.renderer.state.RenderState.StateType;
 import com.ardor3d.scenegraph.event.DirtyType;
+import com.ardor3d.scenegraph.hint.NormalsMode;
 import com.ardor3d.util.Constants;
 import com.ardor3d.util.export.Ardor3DExporter;
 import com.ardor3d.util.export.Ardor3DImporter;
@@ -238,7 +238,8 @@ public class Mesh extends Spatial implements Renderable {
                     renderer.setupColorData(null, null, null);
                     renderer.setupTextureData(null, null);
                 } else {
-                    renderer.setupNormalData(_meshData.getNormalCoords(), getNormalsMode(), _worldTransform, _vboInfo);
+                    renderer.setupNormalData(_meshData.getNormalCoords(), getSceneHints().getNormalsMode(),
+                            _worldTransform, _vboInfo);
                     renderer.setupColorData(_meshData.getColorCoords(), _vboInfo, _defaultColor);
                     renderer.setupTextureData(_meshData.getTextureCoords(), _vboInfo);
                 }

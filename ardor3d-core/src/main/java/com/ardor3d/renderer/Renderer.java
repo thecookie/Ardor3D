@@ -29,6 +29,7 @@ import com.ardor3d.scenegraph.FloatBufferData;
 import com.ardor3d.scenegraph.Renderable;
 import com.ardor3d.scenegraph.Spatial;
 import com.ardor3d.scenegraph.VBOInfo;
+import com.ardor3d.scenegraph.hint.NormalsMode;
 import com.ardor3d.util.Ardor3dException;
 
 /**

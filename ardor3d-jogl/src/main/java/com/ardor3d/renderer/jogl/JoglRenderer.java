@@ -39,7 +39,6 @@ import com.ardor3d.renderer.ContextManager;
 import com.ardor3d.renderer.DrawBufferTarget;
 import com.ardor3d.renderer.IndexMode;
 import com.ardor3d.renderer.InterleavedFormat;
-import com.ardor3d.renderer.NormalsMode;
 import com.ardor3d.renderer.RenderContext;
 import com.ardor3d.renderer.queue.RenderBucketType;
 import com.ardor3d.renderer.queue.RenderQueue;
@@ -85,6 +84,7 @@ import com.ardor3d.scenegraph.Mesh;
 import com.ardor3d.scenegraph.Renderable;
 import com.ardor3d.scenegraph.Spatial;
 import com.ardor3d.scenegraph.VBOInfo;
+import com.ardor3d.scenegraph.hint.NormalsMode;
 import com.ardor3d.util.Ardor3dException;
 import com.ardor3d.util.Constants;
 import com.ardor3d.util.WeakIdentityCache;
@@ -306,7 +306,7 @@ public class JoglRenderer extends AbstractRenderer {
     }
 
     public boolean checkAndAdd(final Spatial s) {
-        final RenderBucketType rqMode = s.getRenderBucketType();
+        final RenderBucketType rqMode = s.getSceneHints().getRenderBucketType();
         if (rqMode != RenderBucketType.Skip) {
             getQueue().addToQueue(s, rqMode);
             return true;

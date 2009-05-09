@@ -23,7 +23,7 @@ import com.ardor3d.image.Image.Format;
 import com.ardor3d.renderer.state.record.StateRecord;
 import com.ardor3d.renderer.state.record.TextureStateRecord;
 import com.ardor3d.scenegraph.Spatial;
-import com.ardor3d.scenegraph.Spatial.TextureCombineMode;
+import com.ardor3d.scenegraph.hint.TextureCombineMode;
 import com.ardor3d.util.TextureManager;
 import com.ardor3d.util.export.Ardor3DExporter;
 import com.ardor3d.util.export.Ardor3DImporter;
@@ -304,7 +304,7 @@ public class TextureState extends RenderState {
             return stack.peek();
         }
 
-        final TextureCombineMode mode = spat.getTextureCombineMode();
+        final TextureCombineMode mode = spat.getSceneHints().getTextureCombineMode();
         if (mode == TextureCombineMode.Replace || (mode != TextureCombineMode.Off && stack.size() == 1)) {
             // todo: use dummy state if off?
             return stack.peek();
