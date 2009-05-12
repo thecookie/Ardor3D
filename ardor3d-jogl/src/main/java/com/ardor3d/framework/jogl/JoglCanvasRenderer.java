@@ -150,7 +150,7 @@ public class JoglCanvasRenderer implements CanvasRenderer {
         _renderer.clearBuffers();
 
         final boolean drew = _scene.renderUnto(_renderer);
-        _renderer.flushFrame(_doSwap);
+        _renderer.flushFrame(drew && _doSwap);
         if (MULTI_CANVAS_MODE) {
             _context.release();
         }
