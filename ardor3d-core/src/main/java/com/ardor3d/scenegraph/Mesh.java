@@ -23,6 +23,9 @@ import com.ardor3d.math.ColorRGBA;
 import com.ardor3d.math.MathUtils;
 import com.ardor3d.math.Vector3;
 import com.ardor3d.math.type.ReadOnlyColorRGBA;
+import com.ardor3d.renderer.ContextCapabilities;
+import com.ardor3d.renderer.ContextManager;
+import com.ardor3d.renderer.RenderContext;
 import com.ardor3d.renderer.Renderer;
 import com.ardor3d.renderer.state.GLSLShaderObjectsState;
 import com.ardor3d.renderer.state.LightState;
@@ -225,33 +228,75 @@ public class Mesh extends Spatial implements Renderable {
         renderer.applyState(StateType.FragmentProgram, _states.get(StateType.FragmentProgram));
         renderer.applyState(StateType.VertexProgram, _states.get(StateType.VertexProgram));
 
+        final RenderContext context = ContextManager.getCurrentContext();
+        final ContextCapabilities caps = context.getCapabilities();
+
         if (getDisplayListID() != -1) {
             renderer.renderDisplayList(getDisplayListID());
-        } else {
+        } else if (_vboInfo != null && caps.isVBOSupported()) {
             if (_meshData.getInterleavedBuffer() != null) {
                 renderer.setupInterleavedData(_meshData.getInterleavedBuffer(), _meshData.getInterleavedFormat(),
                         _vboInfo);
             } else {
-                renderer.setupVertexData(_meshData.getVertexCoords(), _vboInfo);
                 if (RENDER_VERTEX_ONLY) {
-                    renderer.setupNormalData(null, NormalsMode.Off, null, null);
-                    renderer.setupColorData(null, null, null);
-                    renderer.setupTextureData(null, null);
+                    renderer.setupNormalData(null, NormalsMode.Off, null, _vboInfo);
+                    renderer.setupColorData(null, _vboInfo, null);
+                    renderer.setupTextureData(null, _vboInfo);
                 } else {
                     renderer.setupNormalData(_meshData.getNormalCoords(), getSceneHints().getNormalsMode(),
                             _worldTransform, _vboInfo);
                     renderer.setupColorData(_meshData.getColorCoords(), _vboInfo, _defaultColor);
                     renderer.setupTextureData(_meshData.getTextureCoords(), _vboInfo);
                 }
+                renderer.setupVertexData(_meshData.getVertexCoords(), _vboInfo);
             }
 
             if (_meshData.getIndexBuffer() != null) {
-                renderer.drawElements(_meshData.getIndexBuffer(), _vboInfo, _meshData.getIndexLengths(), _meshData
+                if (_vboInfo.isVBOIndexEnabled()) {
+                    renderer.drawElements(_meshData.getIndexBuffer(), _vboInfo, _meshData.getIndexLengths(), _meshData
+                            .getIndexModes());
+                } else {
+                    renderer.drawElements(_meshData.getIndexBuffer(), _meshData.getIndexLengths(), _meshData
+                            .getIndexModes());
+                }
+            } else {
+                renderer
+                        .drawArrays(_meshData.getVertexBuffer(), _meshData.getIndexLengths(), _meshData.getIndexModes());
+            }
+
+            if (Constants.stats) {
+                StatCollector.addStat(StatType.STAT_VERTEX_COUNT, _meshData.getVertexCount());
+                StatCollector.addStat(StatType.STAT_MESH_COUNT, 1);
+            }
+        } else {
+            if (caps.isVBOSupported()) {
+                renderer.unbindVBO();
+            }
+
+            if (_meshData.getInterleavedBuffer() != null) {
+                renderer.setupInterleavedData(_meshData.getInterleavedBuffer(), _meshData.getInterleavedFormat());
+            } else {
+                if (RENDER_VERTEX_ONLY) {
+                    renderer.setupNormalData(null, NormalsMode.Off, null);
+                    renderer.setupColorData(null, null);
+                    renderer.setupTextureData(null);
+                } else {
+                    renderer.setupNormalData(_meshData.getNormalCoords(), getSceneHints().getNormalsMode(),
+                            _worldTransform);
+                    renderer.setupColorData(_meshData.getColorCoords(), _defaultColor);
+                    renderer.setupTextureData(_meshData.getTextureCoords());
+                }
+                renderer.setupVertexData(_meshData.getVertexCoords());
+            }
+
+            if (_meshData.getIndexBuffer() != null) {
+                renderer.drawElements(_meshData.getIndexBuffer(), _meshData.getIndexLengths(), _meshData
                         .getIndexModes());
             } else {
                 renderer
                         .drawArrays(_meshData.getVertexBuffer(), _meshData.getIndexLengths(), _meshData.getIndexModes());
             }
+
             if (Constants.stats) {
                 StatCollector.addStat(StatType.STAT_VERTEX_COUNT, _meshData.getVertexCount());
                 StatCollector.addStat(StatType.STAT_MESH_COUNT, 1);

@@ -202,7 +202,6 @@ public class Skybox extends Node {
 
             // _skyboxQuads[i].setRenderBucketType(RenderBucketType.Skip);
             _skyboxQuads[i].getSceneHints().setRenderBucketType(RenderBucketType.PreBucket);
-            _skyboxQuads[i].setVBOInfo(null);
 
             // And attach the skybox as a child
             attachChild(_skyboxQuads[i]);

@@ -231,6 +231,8 @@ public interface Renderer {
      */
     Integer removeFromVBOCache(Buffer buffer);
 
+    void unbindVBO();
+
     /**
      * Updates a region of the content area of the provided texture using the specified region of the given data.
      * 
@@ -305,12 +307,25 @@ public interface Renderer {
      */
     void undoTransforms(final Transform transform);
 
-    /**
-     * <code>setupVertexData</code> sets up the buffers for vertex data.
-     * 
-     * @param vertices
-     *            transform to apply.
-     */
+    // TODO: Arrays
+    void setupVertexData(final FloatBufferData vertexCoords);
+
+    void setupNormalData(final FloatBufferData normalCoords, final NormalsMode normalMode,
+            final Transform worldTransform);
+
+    void setupColorData(final FloatBufferData colorCoords, final ColorRGBA defaultColor);
+
+    void setupFogData(final FloatBufferData fogCoords);
+
+    void setupTextureData(final List<FloatBufferData> textureCoords);
+
+    void setupInterleavedData(final FloatBuffer interleavedBuffer, InterleavedFormat format);
+
+    void drawElements(final IntBuffer indices, final int[] indexLengths, final IndexMode[] indexModes);
+
+    void drawArrays(final FloatBuffer vertexBuffer, final int[] indexLengths, final IndexMode[] indexModes);
+
+    // TODO: VBO
     void setupVertexData(final FloatBufferData vertexCoords, final VBOInfo vbo);
 
     void setupNormalData(final FloatBufferData normalCoords, final NormalsMode normalMode,
@@ -326,8 +341,7 @@ public interface Renderer {
 
     void drawElements(final IntBuffer indices, final VBOInfo vbo, final int[] indexLengths, final IndexMode[] indexModes);
 
-    void drawArrays(final FloatBuffer vertexBuffer, final int[] indexLengths, final IndexMode[] indexModes);
-
+    // TODO: Display List
     void renderDisplayList(final int displayListID);
 
     void setProjectionMatrix(Buffer matrix);
