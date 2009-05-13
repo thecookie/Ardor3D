@@ -26,6 +26,7 @@ import com.ardor3d.renderer.queue.RenderQueue;
 import com.ardor3d.renderer.state.RenderState;
 import com.ardor3d.renderer.state.RenderState.StateType;
 import com.ardor3d.scenegraph.FloatBufferData;
+import com.ardor3d.scenegraph.Mesh;
 import com.ardor3d.scenegraph.Renderable;
 import com.ardor3d.scenegraph.Spatial;
 import com.ardor3d.scenegraph.VBOInfo;
@@ -338,6 +339,8 @@ public interface Renderer {
     void setupTextureData(final List<FloatBufferData> textureCoords, final VBOInfo vbo);
 
     void setupInterleavedData(final FloatBuffer interleavedBuffer, InterleavedFormat format, final VBOInfo vbo);
+
+    void setupInterleavedData(final Mesh mesh);
 
     void drawElements(final IntBuffer indices, final VBOInfo vbo, final int[] indexLengths, final IndexMode[] indexModes);
 

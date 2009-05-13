@@ -234,9 +234,8 @@ public class Mesh extends Spatial implements Renderable {
         if (getDisplayListID() != -1) {
             renderer.renderDisplayList(getDisplayListID());
         } else if (_vboInfo != null && caps.isVBOSupported()) {
-            if (_meshData.getInterleavedBuffer() != null) {
-                renderer.setupInterleavedData(_meshData.getInterleavedBuffer(), _meshData.getInterleavedFormat(),
-                        _vboInfo);
+            if (_vboInfo.isVBOInterleavedEnabled()) {
+                renderer.setupInterleavedData(this);
             } else {
                 if (RENDER_VERTEX_ONLY) {
                     renderer.setupNormalData(null, NormalsMode.Off, null, _vboInfo);

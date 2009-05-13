@@ -901,6 +901,10 @@ public class JoglRenderer extends AbstractRenderer {
         _oldInterleavedBuffer = interleavedBuffer;
     }
 
+    public void setupInterleavedData(final Mesh mesh) {
+    // TODO Auto-generated method stub
+    }
+
     public void setupFogData(final FloatBufferData fogBufferData, final VBOInfo vbo) {
         final GL gl = GLU.getCurrentGL();
 

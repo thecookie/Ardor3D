@@ -36,6 +36,7 @@ import com.ardor3d.math.ColorRGBA;
 import com.ardor3d.math.Matrix4;
 import com.ardor3d.math.Transform;
 import com.ardor3d.math.type.ReadOnlyColorRGBA;
+import com.ardor3d.math.type.ReadOnlyTransform;
 import com.ardor3d.math.type.ReadOnlyVector3;
 import com.ardor3d.renderer.AbstractRenderer;
 import com.ardor3d.renderer.Camera;
@@ -86,10 +87,12 @@ import com.ardor3d.scene.state.lwjgl.util.LwjglRendererUtil;
 import com.ardor3d.scene.state.lwjgl.util.LwjglTextureUtil;
 import com.ardor3d.scenegraph.FloatBufferData;
 import com.ardor3d.scenegraph.Mesh;
+import com.ardor3d.scenegraph.MeshData;
 import com.ardor3d.scenegraph.Renderable;
 import com.ardor3d.scenegraph.Spatial;
 import com.ardor3d.scenegraph.VBOInfo;
 import com.ardor3d.scenegraph.hint.NormalsMode;
+import com.ardor3d.scenegraph.hint.SceneHints;
 import com.ardor3d.util.Ardor3dException;
 import com.ardor3d.util.Constants;
 import com.ardor3d.util.WeakIdentityCache;
@@ -317,7 +320,7 @@ public class LwjglRenderer extends AbstractRenderer {
         GL11.glFinish();
     }
 
-    private void applyNormalsMode(final NormalsMode normMode, final Transform worldTransform) {
+    private void applyNormalsMode(final NormalsMode normMode, final ReadOnlyTransform worldTransform) {
         final RenderContext context = ContextManager.getCurrentContext();
         final ContextCapabilities caps = context.getCapabilities();
         switch (normMode) {
@@ -684,7 +687,7 @@ public class LwjglRenderer extends AbstractRenderer {
         if (indexLengths == null) {
             final int glIndexMode = getGLIndexMode(indexModes[0]);
 
-            indices.position(0);
+            indices.rewind();
             GL11.glDrawElements(glIndexMode, indices);
 
             if (Constants.stats) {
@@ -943,15 +946,203 @@ public class LwjglRenderer extends AbstractRenderer {
     }
 
     public void setupInterleavedData(final FloatBuffer interleavedBuffer, final InterleavedFormat format,
-            final VBOInfo vbo) {
-        if (_oldInterleavedBuffer != interleavedBuffer) {
-            interleavedBuffer.rewind();
+            final VBOInfo vbo) {}
 
-            final int glFormat = getGLInterleavedFormat(format);
+    public void setupInterleavedData(final Mesh mesh) {
+        final RenderContext context = ContextManager.getCurrentContext();
+        final RendererRecord rendRecord = context.getRendererRecord();
+        final ContextCapabilities caps = context.getCapabilities();
 
-            GL11.glInterleavedArrays(glFormat, 0, interleavedBuffer);
+        final MeshData meshData = mesh.getMeshData();
+        final VBOInfo vbo = mesh.getVBOInfo();
+        final SceneHints sceneHints = mesh.getSceneHints();
+        final ReadOnlyColorRGBA defaultColor = mesh.getDefaultColor();
+
+        if (vbo.getVBOInterleavedID() <= 0) {
+            initializeInterleavedVBO(context, rendRecord, caps, meshData, vbo);
         }
-        _oldInterleavedBuffer = interleavedBuffer;
+
+        LwjglRendererUtil.setBoundVBO(rendRecord, vbo.getVBOInterleavedID());
+
+        int offset = 0;
+
+        if (meshData.getNormalCoords() != null && sceneHints.getNormalsMode() != NormalsMode.Off) {
+            applyNormalsMode(sceneHints.getNormalsMode(), mesh.getWorldTransform());
+
+            GL11.glNormalPointer(GL11.GL_FLOAT, 0, offset);
+            GL11.glEnableClientState(GL11.GL_NORMAL_ARRAY);
+            offset += meshData.getNormalCoords().getCoordsPerVertex() * meshData.getVertexCount() * 4;
+        } else {
+            GL11.glDisableClientState(GL11.GL_NORMAL_ARRAY);
+            if (_prevNormMode == GL12.GL_RESCALE_NORMAL) {
+                GL11.glDisable(GL12.GL_RESCALE_NORMAL);
+                _prevNormMode = GL11.GL_ZERO;
+            } else if (_prevNormMode == GL11.GL_NORMALIZE) {
+                GL11.glDisable(GL11.GL_NORMALIZE);
+                _prevNormMode = GL11.GL_ZERO;
+            }
+        }
+
+        if (meshData.getColorCoords() != null) {
+            GL11.glColorPointer(meshData.getColorCoords().getCoordsPerVertex(), GL11.GL_FLOAT, 0, offset);
+            GL11.glEnableClientState(GL11.GL_COLOR_ARRAY);
+            offset += meshData.getColorCoords().getCoordsPerVertex() * meshData.getVertexCount() * 4;
+        } else {
+            GL11.glDisableClientState(GL11.GL_COLOR_ARRAY);
+            if (defaultColor != null) {
+                GL11.glColor4f(defaultColor.getRed(), defaultColor.getGreen(), defaultColor.getBlue(), defaultColor
+                        .getAlpha());
+            } else {
+                GL11.glColor4f(1, 1, 1, 1);
+            }
+        }
+
+        if (meshData.getTextureCoords() != null) {
+            final List<FloatBufferData> textureCoords = meshData.getTextureCoords();
+            final TextureState ts = (TextureState) context.getCurrentState(RenderState.StateType.Texture);
+            int coordinateOffset = 0;
+            if (ts != null) {
+                coordinateOffset = ts.getTextureCoordinateOffset();
+
+                for (int i = 0; i < ts.getNumberOfSetTextures() && i < caps.getNumberOfFragmentTexCoordUnits(); i++) {
+                    if (caps.isMultitextureSupported()) {
+                        ARBMultitexture.glClientActiveTextureARB(ARBMultitexture.GL_TEXTURE0_ARB + i);
+                    }
+
+                    if (textureCoords == null || i >= textureCoords.size()) {
+                        GL11.glDisableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
+                        continue;
+                    }
+
+                    final FloatBufferData textureBufferData = textureCoords.get(i + coordinateOffset);
+
+                    if (textureBufferData != null) {
+                        GL11.glTexCoordPointer(textureBufferData.getCoordsPerVertex(), GL11.GL_FLOAT, 0, offset);
+                        GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
+                        offset += textureBufferData.getCoordsPerVertex() * meshData.getVertexCount() * 4;
+                    } else {
+                        GL11.glDisableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
+                    }
+                }
+
+                if (ts.getNumberOfSetTextures() < _prevTextureNumber) {
+                    for (int i = ts.getNumberOfSetTextures(); i < _prevTextureNumber; i++) {
+                        if (caps.isMultitextureSupported()) {
+                            ARBMultitexture.glClientActiveTextureARB(ARBMultitexture.GL_TEXTURE0_ARB + i);
+                        }
+                        GL11.glDisableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
+                    }
+                }
+
+                _prevTextureNumber = ts.getNumberOfSetTextures() < caps.getNumberOfFixedTextureUnits() ? ts
+                        .getNumberOfSetTextures() : caps.getNumberOfFixedTextureUnits();
+            }
+        }
+
+        if (meshData.getVertexCoords() != null) {
+            GL11.glVertexPointer(meshData.getVertexCoords().getCoordsPerVertex(), GL11.GL_FLOAT, 0, offset);
+            GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
+            offset += meshData.getVertexCoords().getCoordsPerVertex() * meshData.getVertexCount() * 4;
+        } else {
+            GL11.glDisableClientState(GL11.GL_VERTEX_ARRAY);
+        }
+
+        LwjglRendererUtil.setBoundVBO(rendRecord, 0);
+    }
+
+    private void initializeInterleavedVBO(final RenderContext context, final RendererRecord rendRecord,
+            final ContextCapabilities caps, final MeshData meshData, final VBOInfo vbo) {
+        final int vboID = makeVBOId(rendRecord);
+        vbo.setVBOInterleavedID(vboID);
+
+        rendRecord.invalidateVBO();
+        LwjglRendererUtil.setBoundVBO(rendRecord, vbo.getVBOInterleavedID());
+
+        final int bufferSize = getTotalInterleavedSize(meshData);
+
+        ARBBufferObject.glBufferDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, bufferSize,
+                ARBBufferObject.GL_STATIC_DRAW_ARB);
+
+        int offset = 0;
+        if (meshData.getNormalCoords() != null) {
+            meshData.getNormalCoords().getBuffer().rewind();
+            ARBBufferObject.glBufferSubDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, offset, meshData
+                    .getNormalCoords().getBuffer());
+            offset += meshData.getNormalCoords().getCoordsPerVertex() * meshData.getVertexCount() * 4;
+        }
+        if (meshData.getColorCoords() != null) {
+            meshData.getColorCoords().getBuffer().rewind();
+            ARBBufferObject.glBufferSubDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, offset, meshData
+                    .getColorCoords().getBuffer());
+            offset += meshData.getColorCoords().getCoordsPerVertex() * meshData.getVertexCount() * 4;
+        }
+        if (meshData.getTextureCoords() != null) {
+            final List<FloatBufferData> textureCoords = meshData.getTextureCoords();
+            final TextureState ts = (TextureState) context.getCurrentState(RenderState.StateType.Texture);
+            int coordinateOffset = 0;
+            if (ts != null) {
+                coordinateOffset = ts.getTextureCoordinateOffset();
+
+                for (int i = 0; i < ts.getNumberOfSetTextures() && i < caps.getNumberOfFragmentTexCoordUnits(); i++) {
+                    if (textureCoords == null || i >= textureCoords.size()) {
+                        continue;
+                    }
+
+                    final FloatBufferData textureBufferData = textureCoords.get(i + coordinateOffset);
+                    final FloatBuffer textureBuffer = textureBufferData != null ? textureBufferData.getBuffer() : null;
+                    if (textureBuffer != null) {
+                        textureBuffer.rewind();
+                        ARBBufferObject.glBufferSubDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, offset,
+                                textureBuffer);
+                        offset += textureBufferData.getCoordsPerVertex() * meshData.getVertexCount() * 4;
+                    }
+                }
+            }
+        }
+        if (meshData.getVertexCoords() != null) {
+            meshData.getVertexCoords().getBuffer().rewind();
+            ARBBufferObject.glBufferSubDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, offset, meshData
+                    .getVertexCoords().getBuffer());
+            offset += meshData.getVertexCoords().getCoordsPerVertex() * meshData.getVertexCount() * 4;
+        }
+    }
+
+    private int getTotalInterleavedSize(final MeshData meshData) {
+        final RenderContext context = ContextManager.getCurrentContext();
+        final ContextCapabilities caps = context.getCapabilities();
+
+        int bufferSize = 0;
+        if (meshData.getNormalCoords() != null) {
+            bufferSize += meshData.getNormalCoords().getCoordsPerVertex();
+        }
+        if (meshData.getColorCoords() != null) {
+            bufferSize += meshData.getColorCoords().getCoordsPerVertex();
+        }
+        if (meshData.getTextureCoords() != null) {
+            final List<FloatBufferData> textureCoords = meshData.getTextureCoords();
+            final TextureState ts = (TextureState) context.getCurrentState(RenderState.StateType.Texture);
+            int offset = 0;
+            if (ts != null) {
+                offset = ts.getTextureCoordinateOffset();
+
+                for (int i = 0; i < ts.getNumberOfSetTextures() && i < caps.getNumberOfFragmentTexCoordUnits(); i++) {
+                    if (textureCoords == null || i >= textureCoords.size()) {
+                        continue;
+                    }
+
+                    final FloatBufferData textureBufferData = textureCoords.get(i + offset);
+                    if (textureBufferData != null) {
+                        bufferSize += textureBufferData.getCoordsPerVertex();
+                    }
+                }
+            }
+        }
+        if (meshData.getVertexCoords() != null) {
+            bufferSize += meshData.getVertexCoords().getCoordsPerVertex();
+        }
+        bufferSize *= meshData.getVertexCount() * 4;
+
+        return bufferSize;
     }
 
     public void drawElements(final IntBuffer indices, final VBOInfo vbo, final int[] indexLengths,
@@ -993,7 +1184,7 @@ public class LwjglRenderer extends AbstractRenderer {
             final int glIndexMode = getGLIndexMode(indexModes[0]);
 
             if (!useIndicesVBO) {
-                indices.position(0);
+                indices.rewind();
                 GL11.glDrawElements(glIndexMode, indices);
             } else {
                 GL11.glDrawElements(glIndexMode, indices.limit(), GL11.GL_UNSIGNED_INT, 0);

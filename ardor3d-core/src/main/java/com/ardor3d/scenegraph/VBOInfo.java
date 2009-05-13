@@ -25,12 +25,14 @@ import com.ardor3d.util.export.Savable;
 public class VBOInfo implements Serializable, Savable {
     private static final long serialVersionUID = 1L;
 
+    private boolean _useVBOInterleaved = false;
     private boolean _useVBOVertex = false;
     private boolean _useVBOTexture = false;
     private boolean _useVBOColor = false;
     private boolean _useVBONormal = false;
     private boolean _useVBOFogCoords = false;
     private boolean _useVBOIndex = false;
+    private int _vboInterleavedID = -1;
     private int _vboVertexID = -1;
     private int _vboColorID = -1;
     private int _vboNormalID = -1;
@@ -56,6 +58,7 @@ public class VBOInfo implements Serializable, Savable {
         _useVBONormal = defaultVBO;
         _useVBOFogCoords = defaultVBO;
         _useVBOIndex = false;
+        _useVBOInterleaved = false;
 
         _vboTextureIDs = new int[2];
     }
@@ -67,6 +70,7 @@ public class VBOInfo implements Serializable, Savable {
      */
     public VBOInfo copy() {
         final VBOInfo copy = new VBOInfo();
+        copy._useVBOInterleaved = _useVBOInterleaved;
         copy._useVBOVertex = _useVBOVertex;
         copy._useVBOTexture = _useVBOTexture;
         copy._useVBOColor = _useVBOColor;
@@ -94,6 +98,15 @@ public class VBOInfo implements Serializable, Savable {
         }
 
         _vboTextureIDs = newIDArray;
+    }
+
+    /**
+     * Returns true if VBO (Vertex Buffer) is enabled for interleaved information. This is used during rendering.
+     * 
+     * @return If VBO is enabled for vertexes.
+     */
+    public boolean isVBOInterleavedEnabled() {
+        return _useVBOInterleaved;
     }
 
     /**
@@ -148,6 +161,16 @@ public class VBOInfo implements Serializable, Savable {
      */
     public boolean isVBOColorEnabled() {
         return _useVBOColor;
+    }
+
+    /**
+     * Enables or disables Vertex Buffer Objects for interleaved information.
+     * 
+     * @param enabled
+     *            If true, VBO enabled for vertexes.
+     */
+    public void setVBOInterleavedEnabled(final boolean enabled) {
+        _useVBOInterleaved = enabled;
     }
 
     /**
@@ -210,6 +233,10 @@ public class VBOInfo implements Serializable, Savable {
         _useVBOColor = enabled;
     }
 
+    public int getVBOInterleavedID() {
+        return _vboInterleavedID;
+    }
+
     public int getVBOVertexID() {
         return _vboVertexID;
     }
@@ -231,6 +258,10 @@ public class VBOInfo implements Serializable, Savable {
 
     public int getVBOColorID() {
         return _vboColorID;
+    }
+
+    public void setVBOInterleavedID(final int id) {
+        _vboInterleavedID = id;
     }
 
     public void setVBOVertexID(final int id) {
