@@ -13,6 +13,7 @@ package com.ardor3d.util.stat.graph;
 import java.nio.FloatBuffer;
 
 import com.ardor3d.image.Texture2D;
+import com.ardor3d.image.Image.Format;
 import com.ardor3d.image.Texture.MagnificationFilter;
 import com.ardor3d.image.Texture.MinificationFilter;
 import com.ardor3d.renderer.ContextCapabilities;
@@ -25,6 +26,7 @@ import com.ardor3d.renderer.state.BlendState.SourceFunction;
 import com.ardor3d.scenegraph.hint.LightCombineMode;
 import com.ardor3d.scenegraph.hint.TextureCombineMode;
 import com.ardor3d.scenegraph.shape.Quad;
+import com.ardor3d.util.TextureKey;
 import com.ardor3d.util.stat.StatCollector;
 
 /**
@@ -118,6 +120,8 @@ public abstract class GraphFactory {
      */
     private static Texture2D setupGraphTexture(final AbstractStatGrapher grapher) {
         final Texture2D graphTex = new Texture2D();
+        graphTex.setTextureKey(TextureKey.getKey(null, false, Format.Guess, "graphTex",
+                MinificationFilter.NearestNeighborNoMipMaps));
         graphTex.setMinificationFilter(MinificationFilter.NearestNeighborNoMipMaps);
         graphTex.setMagnificationFilter(MagnificationFilter.Bilinear);
         grapher.setTexture(graphTex);

@@ -10,6 +10,20 @@
 
 package com.ardor3d.example.canvas;
 
+import java.awt.Dimension;
+import java.awt.GridLayout;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.SwingConstants;
+
+import com.ardor3d.example.ExampleBase;
 import com.ardor3d.example.Exit;
 import com.ardor3d.framework.ArdorModule;
 import com.ardor3d.framework.Canvas;
@@ -29,18 +43,12 @@ import com.ardor3d.input.logical.InputTrigger;
 import com.ardor3d.input.logical.KeyPressedCondition;
 import com.ardor3d.input.logical.LogicalLayer;
 import com.ardor3d.input.logical.TriggerAction;
+import com.ardor3d.util.resource.ResourceLocatorTool;
+import com.ardor3d.util.resource.SimpleResourceLocator;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 import com.google.inject.Stage;
-
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 public class LwjglAwtExample {
     static MouseCursor _cursor1;
@@ -79,8 +87,17 @@ public class LwjglAwtExample {
 
         frame.setLayout(new GridLayout(2, 3));
 
+        AWTImageLoader.registerLoader();
 
-        AWTImageLoader awtImageLoader = new AWTImageLoader();
+        try {
+            final SimpleResourceLocator srl = new SimpleResourceLocator(ExampleBase.class.getClassLoader().getResource(
+                    "com/ardor3d/example/media/"));
+            ResourceLocatorTool.addResourceLocator(ResourceLocatorTool.TYPE_TEXTURE, srl);
+        } catch (final URISyntaxException ex) {
+            ex.printStackTrace();
+        }
+
+        final AWTImageLoader awtImageLoader = new AWTImageLoader();
         _cursor1 = createMouseCursor(awtImageLoader, "/com/ardor3d/example/media/input/wait_cursor.png");
         _cursor2 = createMouseCursor(awtImageLoader, "/com/ardor3d/example/media/input/movedata.gif");
 
@@ -120,14 +137,16 @@ public class LwjglAwtExample {
         System.exit(0);
     }
 
-    private static MouseCursor createMouseCursor(final AWTImageLoader awtImageLoader, final String resourceName) throws IOException {
-        com.ardor3d.image.Image image = awtImageLoader.load(LwjglAwtExample.class.getResourceAsStream(resourceName), true);
+    private static MouseCursor createMouseCursor(final AWTImageLoader awtImageLoader, final String resourceName)
+            throws IOException {
+        final com.ardor3d.image.Image image = awtImageLoader.load(LwjglAwtExample.class
+                .getResourceAsStream(resourceName), true);
 
         return new MouseCursor("cursor1", image, 0, image.getHeight() - 1);
     }
 
     private static void addCanvas(final JFrame frame, final ExampleScene scene, final LogicalLayer logicalLayer,
-                                  final FrameHandler frameWork) throws Exception {
+            final FrameHandler frameWork) throws Exception {
         final LwjglCanvasRenderer canvasRenderer = new LwjglCanvasRenderer(scene);
 
         final AwtCanvas theCanvas = new AwtCanvas();
@@ -149,33 +168,30 @@ public class LwjglAwtExample {
 
         logicalLayer.registerInput(theCanvas, pl);
 
-        logicalLayer.registerTrigger(new InputTrigger(new KeyPressedCondition(Key.H),
-                new TriggerAction() {
-                    public void perform(Canvas source, InputState inputState, double tpf) {
-                        if (source != theCanvas) {
-                            return;
-                        }
+        logicalLayer.registerTrigger(new InputTrigger(new KeyPressedCondition(Key.H), new TriggerAction() {
+            public void perform(final Canvas source, final InputState inputState, final double tpf) {
+                if (source != theCanvas) {
+                    return;
+                }
 
-                        if (_showCursor1.get(theCanvas)) {
-                            mouseManager.setCursor(_cursor1);
-                        }
-                        else {
-                            mouseManager.setCursor(_cursor2);
-                        }
+                if (_showCursor1.get(theCanvas)) {
+                    mouseManager.setCursor(_cursor1);
+                } else {
+                    mouseManager.setCursor(_cursor2);
+                }
 
-                        _showCursor1.put(theCanvas, !_showCursor1.get(theCanvas));
-                    }
-                }));
-        logicalLayer.registerTrigger(new InputTrigger(new KeyPressedCondition(Key.J),
-                new TriggerAction() {
-                    public void perform(Canvas source, InputState inputState, double tpf) {
-                        if (source != theCanvas) {
-                            return;
-                        }
+                _showCursor1.put(theCanvas, !_showCursor1.get(theCanvas));
+            }
+        }));
+        logicalLayer.registerTrigger(new InputTrigger(new KeyPressedCondition(Key.J), new TriggerAction() {
+            public void perform(final Canvas source, final InputState inputState, final double tpf) {
+                if (source != theCanvas) {
+                    return;
+                }
 
-                        mouseManager.setCursor(MouseCursor.SYSTEM_DEFAULT);
-                    }
-                }));
+                mouseManager.setCursor(MouseCursor.SYSTEM_DEFAULT);
+            }
+        }));
 
         frameWork.addCanvas(theCanvas);
 

@@ -198,7 +198,7 @@ public class BMFont {
             if (_useMipMaps) {
                 minFilter = Texture.MinificationFilter.Trilinear;
             }
-            final TextureKey tkey = new TextureKey(texUrl, false, Image.Format.GuessNoCompression, minFilter);
+            final TextureKey tkey = TextureKey.getKey(texUrl, false, Image.Format.GuessNoCompression, minFilter);
             _pageTexture = TextureManager.loadFromKey(tkey, null, null);
             _pageTexture.setMagnificationFilter(magFilter);
 

@@ -414,5 +414,5 @@ public interface Renderer {
 
     void loadTexture(Texture texture, int unit);
 
-    void deleteTextureId(int textureId);
+    void deleteTexture(Texture texture);
 }

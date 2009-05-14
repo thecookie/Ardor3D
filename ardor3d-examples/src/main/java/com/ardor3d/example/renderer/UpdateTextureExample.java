@@ -88,8 +88,6 @@ public class UpdateTextureExample extends ExampleBase {
             final Texture prevTexture = ((TextureState) _root.getLocalRenderState(RenderState.StateType.Texture))
                     .getTexture();
             TextureManager.releaseTexture(prevTexture, renderer);
-            prevTexture.getTextureKey().setContextRep(null); // TODO: hack for texture caching bug
-            TextureManager.releaseTexture(prevTexture, renderer);
             final TextureState ts = (TextureState) _root.getLocalRenderState(RenderState.StateType.Texture);
             ts.setTexture(nextTexture);
         }

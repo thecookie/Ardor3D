@@ -458,8 +458,10 @@ public class JoglRenderer extends AbstractRenderer {
         final int pixelFormat = JoglTextureUtil.getGLPixelFormat(format);
 
         // Update the texture configuration (when necessary).
-        if (origTexBinding[0] != dstTexture.getTextureId()) {
-            gl.glBindTexture(GL.GL_TEXTURE_2D, dstTexture.getTextureId());
+        final RenderContext context = ContextManager.getCurrentContext();
+        final int dstTexID = dstTexture.getTextureIdForContext(context.getGlContextRep());
+        if (origTexBinding[0] != dstTexID) {
+            gl.glBindTexture(GL.GL_TEXTURE_2D, dstTexID);
         }
         if (origAlignment[0] != alignment) {
             gl.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, alignment);
@@ -493,7 +495,7 @@ public class JoglRenderer extends AbstractRenderer {
 
         // Restore the texture configuration (when necessary).
         // Restore the texture binding.
-        if (origTexBinding[0] != dstTexture.getTextureId()) {
+        if (origTexBinding[0] != dstTexID) {
             gl.glBindTexture(GL.GL_TEXTURE_2D, origTexBinding[0]);
         }
         // Restore alignment.
@@ -1503,8 +1505,8 @@ public class JoglRenderer extends AbstractRenderer {
         throw new IllegalArgumentException("Unknown state: " + state);
     }
 
-    public void deleteTextureId(final int textureId) {
-        JoglTextureStateUtil.deleteTextureId(textureId);
+    public void deleteTexture(final Texture texture) {
+        JoglTextureStateUtil.deleteTexture(texture);
     }
 
     public void loadTexture(final Texture texture, final int unit) {

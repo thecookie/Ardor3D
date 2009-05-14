@@ -83,59 +83,31 @@ public class JoglTextureStateUtil {
         // Create the texture...
         if (texture.getTextureKey() != null) {
 
-            // First, check if we've already created this texture for our gl context (already on the card)
-
-            if (texture.getTextureKey().getContextRep() == null) {
-                // remove from cache, we'll add it later
-                TextureManager.removeFromCache(texture.getTextureKey());
-            } else if (texture.getTextureKey().getContextRep() != context.getGlContextRep()) {
-                // if texture key has a context already, and it is not ours, complain.
-                logger.warning("Texture key is morphing contexts: " + texture.getTextureKey());
-            }
-
-            // make sure our context is set.
-            // XXX don't alter object which is a key in cache hash:
-            // XXX texture.getTextureKey().setContextRep(context.getGlContextRep());
-            final TextureKey texKey = new TextureKey(texture.getTextureKey());
-            texKey.setContextRep(context.getGlContextRep());
-
-            // Look for a texture in the cache just like ours, also in the same context.
+            // Look for a texture in the cache just like ours
+            final TextureKey texKey = texture.getTextureKey();
             final Texture cached = TextureManager.findCachedTexture(texKey);
 
             if (cached == null) {
-                final Texture otherContext = TextureManager.findCachedTexture(texture.getTextureKey());
-                if (otherContext != null) {
-                    otherContext.createSimpleClone(texture);
-                }
-                texture.setTextureKey(texKey);
                 TextureManager.addToCache(texture);
-            } else if (cached.getTextureId() != 0) {
-                texture.setTextureId(cached.getTextureId());
-                gl.glBindTexture(getGLType(type), cached.getTextureId());
-                if (Constants.stats) {
-                    StatCollector.addStat(StatType.STAT_TEXTURE_BINDS, 1);
+            } else {
+                final int textureId = cached.getTextureIdForContext(context.getGlContextRep());
+                if (textureId != 0) {
+                    doTextureBind(cached, unit, false);
+                    return;
                 }
-                if (record != null) {
-                    record.units[unit].boundTexture = texture.getTextureId();
-                }
-                return;
             }
         }
 
         final IntBuffer id = BufferUtils.createIntBuffer(1);
         id.clear();
         gl.glGenTextures(id.limit(), id);
-        texture.setTextureId(id.get(0));
+        final int textureId = id.get(0);
 
-        gl.glBindTexture(getGLType(type), texture.getTextureId());
-        if (Constants.stats) {
-            StatCollector.addStat(StatType.STAT_TEXTURE_BINDS, 1);
-        }
-        if (record != null) {
-            record.units[unit].boundTexture = texture.getTextureId();
-        }
+        // store the new id by our current gl context.
+        texture.setTextureIdForContext(context.getGlContextRep(), textureId);
 
-        TextureManager.registerForCleanup(texture.getTextureKey(), texture.getTextureId());
+        // bind our texture id to this unit.
+        doTextureBind(texture, unit, false);
 
         // pass image data to OpenGL
         final Image image = texture.getImage();
@@ -539,9 +511,12 @@ public class JoglTextureStateUtil {
                 // grab a texture for this unit, if available
                 texture = state.getTexture(i);
 
+                // pull our texture id for this texture, for this context.
+                int textureId = texture != null ? texture.getTextureIdForContext(context.getGlContextRep()) : -1;
+
                 // check for invalid textures - ones that have no opengl id and
                 // no image data
-                if (texture != null && texture.getTextureId() == 0 && texture.getImage() == null) {
+                if (texture != null && textureId == 0 && texture.getImage() == null) {
                     texture = null;
                 }
 
@@ -555,8 +530,8 @@ public class JoglTextureStateUtil {
                         // Disable texturing on this unit if enabled.
                         disableTexturing(unitRecord, record, i, caps);
 
-                        if (i < state._idCache.length) {
-                            state._idCache[i] = 0;
+                        if (i < state._keyCache.length) {
+                            state._keyCache[i] = null;
                         }
 
                         // next texture!
@@ -571,33 +546,34 @@ public class JoglTextureStateUtil {
 
                 // Time to bind the texture, so see if we need to load in image
                 // data for this texture.
-                if (texture.getTextureId() == 0) {
+                if (textureId == 0) {
                     // texture not yet loaded.
                     // this will load and bind and set the records...
                     load(texture, i);
-                    if (texture.getTextureId() == 0) {
+                    textureId = texture.getTextureIdForContext(context.getGlContextRep());
+                    if (textureId == 0) {
                         continue;
                     }
                 } else {
                     // texture already exists in OpenGL, just bind it if needed
-                    if (!unitRecord.isValid() || unitRecord.boundTexture != texture.getTextureId()) {
+                    if (!unitRecord.isValid() || unitRecord.boundTexture != textureId) {
                         checkAndSetUnit(i, record, caps);
-                        gl.glBindTexture(getGLType(type), texture.getTextureId());
+                        gl.glBindTexture(getGLType(type), textureId);
                         if (Constants.stats) {
                             StatCollector.addStat(StatType.STAT_TEXTURE_BINDS, 1);
                         }
-                        unitRecord.boundTexture = texture.getTextureId();
+                        unitRecord.boundTexture = textureId;
                     }
                 }
 
                 // Grab our record for this texture
-                texRecord = record.getTextureRecord(texture.getTextureId(), texture.getType());
+                texRecord = record.getTextureRecord(textureId, texture.getType());
 
-                // Set the idCache value for this unit of this texture state
+                // Set the keyCache value for this unit of this texture state
                 // This is done so during state comparison we don't have to
                 // spend a lot of time pulling out classes and finding field
                 // data.
-                state._idCache[i] = texture.getTextureId();
+                state._keyCache[i] = texture.getTextureKey();
 
                 // Some texture things only apply to fixed function pipeline
                 if (i < caps.getNumberOfFixedTextureUnits()) {
@@ -1556,69 +1532,47 @@ public class JoglTextureStateUtil {
         }
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.ardor3d.scene.state.TextureState#delete(int)
-     */
-    public static void delete(final int unit, final Texture tex) {
+    public static void deleteTexture(final Texture texture) {
         final GL gl = GLU.getCurrentGL();
 
         // ask for the current state record
         final RenderContext context = ContextManager.getCurrentContext();
         final TextureStateRecord record = (TextureStateRecord) context.getStateRecord(StateType.Texture);
 
-        final int texId = tex.getTextureId();
+        final int id = texture.getTextureIdForContext(context.getGlContextRep());
 
-        final IntBuffer id = BufferUtils.createIntBuffer(1);
-        id.clear();
-        id.put(texId);
-        id.rewind();
-        tex.setTextureId(0);
-
-        gl.glDeleteTextures(id.limit(), id);
-
-        // if the texture was currently bound glDeleteTextures reverts the
-        // binding to 0
-        // however we still have to clear it from currentTexture.
-        record.removeTextureRecord(texId);
-    }
-
-    public static void deleteTextureId(final int textureId) {
-        final GL gl = GLU.getCurrentGL();
-
-        // ask for the current state record
-        final RenderContext context = ContextManager.getCurrentContext();
-        final TextureStateRecord record = (TextureStateRecord) context.getStateRecord(StateType.Texture);
-
-        final IntBuffer id = BufferUtils.createIntBuffer(1);
-        id.clear();
-        id.put(textureId);
-        id.rewind();
-        gl.glDeleteTextures(id.limit(), id);
-        record.removeTextureRecord(textureId);
+        final IntBuffer idBuffer = BufferUtils.createIntBuffer(1);
+        idBuffer.clear();
+        idBuffer.put(id);
+        idBuffer.rewind();
+        gl.glDeleteTextures(idBuffer.limit(), idBuffer);
+        record.removeTextureRecord(id);
+        texture.removeFromIdCache(context.getGlContextRep());
     }
 
     /**
      * Useful for external jogl based classes that need to safely set the current texture.
      */
-    public static void doTextureBind(final int textureId, final int unit, final Type type) {
+    public static void doTextureBind(final Texture texture, final int unit, final boolean invalidateState) {
         final GL gl = GLU.getCurrentGL();
 
         // ask for the current state record
         final RenderContext context = ContextManager.getCurrentContext();
         final ContextCapabilities caps = context.getCapabilities();
         final TextureStateRecord record = (TextureStateRecord) context.getStateRecord(StateType.Texture);
-        // Set this to null because no current state really matches anymore
-        context.setCurrentState(StateType.Texture, null);
+        if (invalidateState) {
+            // Set this to null because no current state really matches anymore
+            context.setCurrentState(StateType.Texture, null);
+        }
         checkAndSetUnit(unit, record, caps);
 
-        gl.glBindTexture(getGLType(type), textureId);
+        final int id = texture.getTextureIdForContext(context.getGlContextRep());
+        gl.glBindTexture(getGLType(texture.getType()), id);
         if (Constants.stats) {
             StatCollector.addStat(StatType.STAT_TEXTURE_BINDS, 1);
         }
         if (record != null) {
-            record.units[unit].boundTexture = textureId;
+            record.units[unit].boundTexture = id;
         }
     }
 

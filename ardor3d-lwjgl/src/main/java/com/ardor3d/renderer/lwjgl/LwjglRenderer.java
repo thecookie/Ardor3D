@@ -441,8 +441,10 @@ public class LwjglRenderer extends AbstractRenderer {
         final int pixelFormat = LwjglTextureUtil.getGLPixelFormat(format);
 
         // Update the texture configuration (when necessary).
-        if (origTexBinding != dstTexture.getTextureId()) {
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, dstTexture.getTextureId());
+        final RenderContext context = ContextManager.getCurrentContext();
+        final int dstTexID = dstTexture.getTextureIdForContext(context.getGlContextRep());
+        if (origTexBinding != dstTexID) {
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, dstTexID);
         }
         if (origAlignment != alignment) {
             GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, alignment);
@@ -476,7 +478,7 @@ public class LwjglRenderer extends AbstractRenderer {
 
         // Restore the texture configuration (when necessary).
         // Restore the texture binding.
-        if (origTexBinding != dstTexture.getTextureId()) {
+        if (origTexBinding != dstTexID) {
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, origTexBinding);
         }
         // Restore alignment.
@@ -1624,8 +1626,8 @@ public class LwjglRenderer extends AbstractRenderer {
         throw new IllegalArgumentException("Unknown state: " + state);
     }
 
-    public void deleteTextureId(final int textureId) {
-        LwjglTextureStateUtil.deleteTextureId(textureId);
+    public void deleteTexture(final Texture texture) {
+        LwjglTextureStateUtil.deleteTexture(texture);
     }
 
     public void loadTexture(final Texture texture, final int unit) {
