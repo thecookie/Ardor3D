@@ -41,6 +41,7 @@ import com.ardor3d.scene.state.lwjgl.LwjglTextureStateUtil;
 import com.ardor3d.scene.state.lwjgl.util.LwjglTextureUtil;
 import com.ardor3d.scenegraph.Spatial;
 import com.ardor3d.util.Ardor3dException;
+import com.ardor3d.util.TextureKey;
 import com.ardor3d.util.geom.BufferUtils;
 
 /**
@@ -90,6 +91,9 @@ public class LwjglPbufferTextureRenderer extends AbstractPbufferTextureRenderer 
      * texture id for this texture and inits the data type for the texture.
      */
     public void setupTexture(final Texture2D tex) {
+        if (tex.getTextureKey() == null) {
+            tex.setTextureKey(TextureKey.getUniqueKey(tex.getMinificationFilter()));
+        }
 
         final RenderContext context = ContextManager.getCurrentContext();
         final TextureStateRecord record = (TextureStateRecord) context.getStateRecord(RenderState.StateType.Texture);

@@ -19,6 +19,7 @@ import java.util.WeakHashMap;
 
 import com.ardor3d.image.Image;
 import com.ardor3d.image.Texture;
+import com.ardor3d.image.Image.Format;
 import com.ardor3d.image.Texture.MinificationFilter;
 import com.ardor3d.renderer.RenderContext;
 import com.ardor3d.util.export.Ardor3DExporter;
@@ -45,6 +46,16 @@ final public class TextureKey implements Savable {
 
     /** DO NOT USE. FOR SAVABLE USE ONLY */
     TextureKey() {}
+
+    private static int _uniqueTK = Integer.MIN_VALUE;
+
+    public static synchronized TextureKey getUniqueKey(final MinificationFilter minFilter) {
+        _uniqueTK++;
+        if (_uniqueTK == Integer.MAX_VALUE) {
+            _uniqueTK = Integer.MIN_VALUE;
+        }
+        return getKey(null, false, Format.Guess, "" + _uniqueTK, minFilter);
+    }
 
     public static TextureKey getKey(final URL location, final boolean flipped, final Image.Format imageType,
             final Texture.MinificationFilter minFilter) {
@@ -229,5 +240,4 @@ final public class TextureKey implements Savable {
         _minFilter = capsule.readEnum("minFilter", MinificationFilter.class, MinificationFilter.Trilinear);
         _fileType = capsule.readString("fileType", null);
     }
-
 }

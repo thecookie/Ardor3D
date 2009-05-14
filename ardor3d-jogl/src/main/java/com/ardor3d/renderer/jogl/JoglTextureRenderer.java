@@ -35,6 +35,7 @@ import com.ardor3d.scene.state.jogl.JoglTextureStateUtil;
 import com.ardor3d.scene.state.jogl.util.JoglTextureUtil;
 import com.ardor3d.scenegraph.Spatial;
 import com.ardor3d.util.Ardor3dException;
+import com.ardor3d.util.TextureKey;
 import com.ardor3d.util.geom.BufferUtils;
 
 /**
@@ -63,6 +64,10 @@ public class JoglTextureRenderer extends AbstractFBOTextureRenderer {
      * texture id for this texture and initializes the data type for the texture.
      */
     public void setupTexture(final Texture2D tex) {
+        if (tex.getTextureKey() == null) {
+            tex.setTextureKey(TextureKey.getUniqueKey(tex.getMinificationFilter()));
+        }
+
         final GL gl = GLU.getCurrentGL();
 
         final RenderContext context = ContextManager.getCurrentContext();
