@@ -45,7 +45,7 @@ final public class TextureKey implements Savable {
     protected static final List<TextureKey> _keyCache = new ArrayList<TextureKey>();
 
     /** DO NOT USE. FOR SAVABLE USE ONLY */
-    TextureKey() {}
+    public TextureKey() {}
 
     private static int _uniqueTK = Integer.MIN_VALUE;
 
