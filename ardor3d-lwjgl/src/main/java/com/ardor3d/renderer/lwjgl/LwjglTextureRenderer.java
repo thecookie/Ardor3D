@@ -67,15 +67,14 @@ public class LwjglTextureRenderer extends AbstractFBOTextureRenderer {
      * texture id for this texture and initializes the data type for the texture.
      */
     public void setupTexture(final Texture2D tex) {
-        if (tex.getTextureKey() == null) {
-            tex.setTextureKey(TextureKey.getUniqueKey(tex.getMinificationFilter()));
-        }
 
         final RenderContext context = ContextManager.getCurrentContext();
         final TextureStateRecord record = (TextureStateRecord) context.getStateRecord(RenderState.StateType.Texture);
 
         // check if we are already setup... if so, throw error.
-        if (tex.getTextureIdForContext(context.getGlContextRep()) != 0) {
+        if (tex.getTextureKey() == null) {
+            tex.setTextureKey(TextureKey.getRTTKey(tex.getMinificationFilter()));
+        } else if (tex.getTextureIdForContext(context.getGlContextRep()) != 0) {
             throw new Ardor3dException("Texture is already setup and has id.");
         }
 

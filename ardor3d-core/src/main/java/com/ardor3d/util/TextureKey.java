@@ -49,7 +49,15 @@ final public class TextureKey implements Savable {
 
     private static int _uniqueTK = Integer.MIN_VALUE;
 
-    public static synchronized TextureKey getUniqueKey(final MinificationFilter minFilter) {
+    /**
+     * Get a new unique TextureKey. This is meant for use by RTT and other situations where we know we are making a
+     * unique texture.
+     * 
+     * @param minFilter
+     *            our minification filter value.
+     * @return the new TextureKey
+     */
+    public static synchronized TextureKey getRTTKey(final MinificationFilter minFilter) {
         _uniqueTK++;
         if (_uniqueTK == Integer.MAX_VALUE) {
             _uniqueTK = Integer.MIN_VALUE;
@@ -57,13 +65,13 @@ final public class TextureKey implements Savable {
         return getKey(null, false, Format.Guess, "" + _uniqueTK, minFilter);
     }
 
-    public static TextureKey getKey(final URL location, final boolean flipped, final Image.Format imageType,
-            final Texture.MinificationFilter minFilter) {
+    public static synchronized TextureKey getKey(final URL location, final boolean flipped,
+            final Image.Format imageType, final Texture.MinificationFilter minFilter) {
         return getKey(location, flipped, imageType, null, minFilter);
     }
 
-    public static TextureKey getKey(final URL location, final boolean flipped, final Image.Format imageType,
-            final String fileType, final Texture.MinificationFilter minFilter) {
+    public static synchronized TextureKey getKey(final URL location, final boolean flipped,
+            final Image.Format imageType, final String fileType, final Texture.MinificationFilter minFilter) {
         final TextureKey key = new TextureKey();
 
         key._location = location;
