@@ -237,6 +237,7 @@ public class JoglRenderer extends AbstractRenderer {
                 StatCollector.startStat(StatType.STAT_DISPLAYSWAP_TIMER);
             }
 
+            checkCardError();
             GLContext.getCurrent().getGLDrawable().swapBuffers();
             if (Constants.stats) {
                 StatCollector.endStat(StatType.STAT_DISPLAYSWAP_TIMER);
@@ -428,6 +429,12 @@ public class JoglRenderer extends AbstractRenderer {
             final int dstHeight, final Format format) throws Ardor3dException, UnsupportedOperationException {
         final GL gl = GLU.getCurrentGL();
 
+        // Ignore textures that do not have an id set
+        if (dstTexture.getTextureIdForContext(ContextManager.getCurrentContext().getGlContextRep()) == 0) {
+            logger.warning("Attempting to update a texture that is not currently on the card.");
+            return;
+        }
+
         // Check that the texture type is supported.
         if (dstTexture.getType() != Texture.Type.TwoDimensional) {
             throw new UnsupportedOperationException("Unsupported Texture Type: " + dstTexture.getType());
@@ -477,42 +484,44 @@ public class JoglRenderer extends AbstractRenderer {
         }
 
         // Upload the image region into the texture.
-        if (glTexSubImage2DSupported) {
-            gl.glTexSubImage2D(GL.GL_TEXTURE_2D, 0, dstX, dstY, dstWidth, dstHeight, pixelFormat, GL.GL_UNSIGNED_BYTE,
-                    data);
+        try {
+            if (glTexSubImage2DSupported) {
+                gl.glTexSubImage2D(GL.GL_TEXTURE_2D, 0, dstX, dstY, dstWidth, dstHeight, pixelFormat,
+                        GL.GL_UNSIGNED_BYTE, data);
 
-            final int errorCode = gl.glGetError();
-            if (errorCode != GL.GL_NO_ERROR) {
-                glTexSubImage2DSupported = false;
-                updateTextureSubImage(dstTexture, data, srcX, srcY, srcWidth, srcHeight, dstX, dstY, dstWidth,
-                        dstHeight, format);
+                final int errorCode = gl.glGetError();
+                if (errorCode != GL.GL_NO_ERROR) {
+                    glTexSubImage2DSupported = false;
+                    updateTextureSubImage(dstTexture, data, srcX, srcY, srcWidth, srcHeight, dstX, dstY, dstWidth,
+                            dstHeight, format);
+                }
+            } else {
+                final int internalFormat = JoglTextureUtil.getGLInternalFormat(format);
+                gl.glTexImage2D(GL.GL_TEXTURE_2D, 0, internalFormat, dstWidth, dstHeight, 0, pixelFormat,
+                        GL.GL_UNSIGNED_BYTE, data);
             }
-        } else {
-            final int internalFormat = JoglTextureUtil.getGLInternalFormat(format);
-            gl.glTexImage2D(GL.GL_TEXTURE_2D, 0, internalFormat, dstWidth, dstHeight, 0, pixelFormat,
-                    GL.GL_UNSIGNED_BYTE, data);
-        }
-
-        // Restore the texture configuration (when necessary).
-        // Restore the texture binding.
-        if (origTexBinding[0] != dstTexID) {
-            gl.glBindTexture(GL.GL_TEXTURE_2D, origTexBinding[0]);
-        }
-        // Restore alignment.
-        if (origAlignment[0] != alignment) {
-            gl.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, origAlignment[0]);
-        }
-        // Restore row length.
-        if (origRowLength != rowLength) {
-            gl.glPixelStorei(GL.GL_UNPACK_ROW_LENGTH, origRowLength);
-        }
-        // Restore skip pixels.
-        if (origSkipPixels != srcX) {
-            gl.glPixelStorei(GL.GL_UNPACK_SKIP_PIXELS, origSkipPixels);
-        }
-        // Restore skip rows.
-        if (origSkipRows != srcY) {
-            gl.glPixelStorei(GL.GL_UNPACK_SKIP_ROWS, origSkipRows);
+        } finally {
+            // Restore the texture configuration (when necessary).
+            // Restore the texture binding.
+            if (origTexBinding[0] != dstTexID) {
+                gl.glBindTexture(GL.GL_TEXTURE_2D, origTexBinding[0]);
+            }
+            // Restore alignment.
+            if (origAlignment[0] != alignment) {
+                gl.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, origAlignment[0]);
+            }
+            // Restore row length.
+            if (origRowLength != rowLength) {
+                gl.glPixelStorei(GL.GL_UNPACK_ROW_LENGTH, origRowLength);
+            }
+            // Restore skip pixels.
+            if (origSkipPixels != srcX) {
+                gl.glPixelStorei(GL.GL_UNPACK_SKIP_PIXELS, origSkipPixels);
+            }
+            // Restore skip rows.
+            if (origSkipRows != srcY) {
+                gl.glPixelStorei(GL.GL_UNPACK_SKIP_ROWS, origSkipRows);
+            }
         }
     }
 

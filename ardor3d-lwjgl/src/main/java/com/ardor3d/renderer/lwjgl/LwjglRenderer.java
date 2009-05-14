@@ -409,6 +409,13 @@ public class LwjglRenderer extends AbstractRenderer {
     public void updateTextureSubImage(final Texture dstTexture, final ByteBuffer data, final int srcX, final int srcY,
             final int srcWidth, final int srcHeight, final int dstX, final int dstY, final int dstWidth,
             final int dstHeight, final Format format) throws Ardor3dException, UnsupportedOperationException {
+
+        // Ignore textures that do not have an id set
+        if (dstTexture.getTextureIdForContext(ContextManager.getCurrentContext().getGlContextRep()) == 0) {
+            logger.warning("Attempting to update a texture that is not currently on the card.");
+            return;
+        }
+
         // Check that the texture type is supported.
         if (dstTexture.getType() != Texture.Type.TwoDimensional) {
             throw new UnsupportedOperationException("Unsupported Texture Type: " + dstTexture.getType());

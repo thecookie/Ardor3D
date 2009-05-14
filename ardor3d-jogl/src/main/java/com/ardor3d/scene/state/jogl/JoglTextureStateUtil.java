@@ -369,114 +369,142 @@ public class JoglTextureStateUtil {
                 }
 
             } else {
-                // Here we handle textures that are either compressed or have
-                // predefined mipmaps.
-                // Get mipmap data sizes and amount of mipmaps to send to
-                // opengl. Then loop through all mipmaps and send them.
+                // Here we handle textures that are either compressed or have predefined mipmaps.
+                // Get mipmap data sizes and amount of mipmaps to send to opengl. Then loop through all mipmaps and send
+                // them.
                 int[] mipSizes = image.getMipMapSizes();
-                ByteBuffer data = image.getData(0);
-                if (type == Type.ThreeDimensional) {
-                    if (caps.isTexture3DSupported()) {
-                        // concat data into single buffer:
-                        int dSize = 0;
-                        int count = 0;
-                        for (int x = 0; x < image.getData().size(); x++) {
-                            if (image.getData(x) != null) {
-                                data = image.getData(x);
-                                dSize += data.limit();
-                                count++;
+                ByteBuffer data = null;
+                if (type == Type.CubeMap) {
+                    if (caps.isTextureCubeMapSupported()) {
+                        for (final TextureCubeMap.Face face : TextureCubeMap.Face.values()) {
+                            data = image.getData(face.ordinal());
+                            int pos = 0;
+                            int max = 1;
+
+                            if (mipSizes == null) {
+                                mipSizes = new int[] { data.capacity() };
+                            } else if (texture.getMinificationFilter().usesMipMapLevels()) {
+                                max = mipSizes.length;
                             }
-                        }
-                        // reuse buffer if we can.
-                        if (count != 1) {
-                            data = BufferUtils.createByteBuffer(dSize);
-                            for (int x = 0; x < image.getData().size(); x++) {
-                                if (image.getData(x) != null) {
-                                    data.put(image.getData(x));
+
+                            for (int m = 0; m < max; m++) {
+                                final int width = Math.max(1, image.getWidth() >> m);
+                                final int height = type != Type.OneDimensional ? Math.max(1, image.getHeight() >> m)
+                                        : 0;
+
+                                data.position(pos);
+                                data.limit(pos + mipSizes[m]);
+
+                                if (JoglTextureUtil.isCompressedType(image.getFormat())) {
+                                    gl.glCompressedTexImage2D(getGLCubeMapFace(face), m, JoglTextureUtil
+                                            .getGLInternalFormat(image.getFormat()), width, height, hasBorder ? 1 : 0,
+                                            mipSizes[m], data);
+                                } else {
+                                    gl.glTexImage2D(getGLCubeMapFace(face), m, JoglTextureUtil
+                                            .getGLInternalFormat(image.getFormat()), width, height, hasBorder ? 1 : 0,
+                                            JoglTextureUtil.getGLPixelFormat(image.getFormat()), JoglTextureUtil
+                                                    .getGLPixelDataType(image.getFormat()), data);
                                 }
+                                pos += mipSizes[m];
                             }
-                            // ensure the buffer is ready for reading
-                            data.flip();
                         }
                     } else {
-                        logger.warning("This card does not support Texture3D.");
+                        logger.warning("This card does not support CubeMaps.");
                         return;
                     }
-                }
-                int max = 1;
-                int pos = 0;
-                if (mipSizes == null) {
-                    mipSizes = new int[] { data.capacity() };
-                } else if (texture.getMinificationFilter().usesMipMapLevels()) {
-                    max = mipSizes.length;
-                }
+                } else {
+                    data = image.getData(0);
+                    int pos = 0;
+                    int max = 1;
 
-                for (int m = 0; m < max; m++) {
-                    final int width = Math.max(1, image.getWidth() >> m);
-                    final int height = type != Type.OneDimensional ? Math.max(1, image.getHeight() >> m) : 0;
-                    final int depth = type == Type.ThreeDimensional ? Math.max(1, image.getDepth() >> m) : 0;
-
-                    data.position(pos);
-                    data.limit(pos + mipSizes[m]);
-
-                    switch (type) {
-                        case TwoDimensional:
-                            if (JoglTextureUtil.isCompressedType(image.getFormat())) {
-                                gl.glCompressedTexImage2D(GL.GL_TEXTURE_2D, m, JoglTextureUtil
-                                        .getGLInternalFormat(image.getFormat()), width, height, hasBorder ? 1 : 0,
-                                        mipSizes[m], data);
-                            } else {
-                                gl.glTexImage2D(GL.GL_TEXTURE_2D, m, JoglTextureUtil.getGLInternalFormat(image
-                                        .getFormat()), width, height, hasBorder ? 1 : 0, JoglTextureUtil
-                                        .getGLPixelFormat(image.getFormat()), JoglTextureUtil.getGLPixelDataType(image
-                                        .getFormat()), data);
-                            }
-                            break;
-                        case OneDimensional:
-                            if (JoglTextureUtil.isCompressedType(image.getFormat())) {
-                                gl.glCompressedTexImage1D(GL.GL_TEXTURE_1D, m, JoglTextureUtil
-                                        .getGLInternalFormat(image.getFormat()), width, hasBorder ? 1 : 0, mipSizes[m],
-                                        data);
-                            } else {
-                                gl.glTexImage1D(GL.GL_TEXTURE_1D, m, JoglTextureUtil.getGLInternalFormat(image
-                                        .getFormat()), width, hasBorder ? 1 : 0, JoglTextureUtil.getGLPixelFormat(image
-                                        .getFormat()), JoglTextureUtil.getGLPixelDataType(image.getFormat()), data);
-                            }
-                            break;
-                        case ThreeDimensional:
-                            // already checked for support above...
-                            if (JoglTextureUtil.isCompressedType(image.getFormat())) {
-                                gl.glCompressedTexImage3D(GL.GL_TEXTURE_3D, m, JoglTextureUtil
-                                        .getGLInternalFormat(image.getFormat()), width, height, depth, hasBorder ? 1
-                                        : 0, mipSizes[m], data);
-                            } else {
-                                gl.glTexImage3D(GL.GL_TEXTURE_3D, m, JoglTextureUtil.getGLInternalFormat(image
-                                        .getFormat()), width, height, depth, hasBorder ? 1 : 0, JoglTextureUtil
-                                        .getGLPixelFormat(image.getFormat()), JoglTextureUtil.getGLPixelDataType(image
-                                        .getFormat()), data);
-                            }
-                            break;
-                        case CubeMap:
-                            if (caps.isTextureCubeMapSupported()) {
-                                for (final TextureCubeMap.Face face : TextureCubeMap.Face.values()) {
-                                    if (JoglTextureUtil.isCompressedType(image.getFormat())) {
-                                        gl.glCompressedTexImage2D(getGLCubeMapFace(face), m, JoglTextureUtil
-                                                .getGLInternalFormat(image.getFormat()), width, height, hasBorder ? 1
-                                                : 0, mipSizes[m], data);
-                                    } else {
-                                        gl.glTexImage2D(getGLCubeMapFace(face), m, JoglTextureUtil
-                                                .getGLInternalFormat(image.getFormat()), width, height, hasBorder ? 1
-                                                : 0, JoglTextureUtil.getGLPixelFormat(image.getFormat()),
-                                                JoglTextureUtil.getGLPixelDataType(image.getFormat()), data);
-                                    }
+                    if (mipSizes == null) {
+                        mipSizes = new int[] { data.capacity() };
+                    } else if (texture.getMinificationFilter().usesMipMapLevels()) {
+                        max = mipSizes.length;
+                    }
+                    if (type == Type.ThreeDimensional) {
+                        if (caps.isTexture3DSupported()) {
+                            // concat data into single buffer:
+                            int dSize = 0;
+                            int count = 0;
+                            for (int x = 0; x < image.getData().size(); x++) {
+                                if (image.getData(x) != null) {
+                                    data = image.getData(x);
+                                    dSize += data.limit();
+                                    count++;
                                 }
                             }
-                            break;
+                            // reuse buffer if we can.
+                            if (count != 1) {
+                                data = BufferUtils.createByteBuffer(dSize);
+                                for (int x = 0; x < image.getData().size(); x++) {
+                                    if (image.getData(x) != null) {
+                                        data.put(image.getData(x));
+                                    }
+                                }
+                                // ensure the buffer is ready for reading
+                                data.flip();
+                            }
+                        } else {
+                            logger.warning("This card does not support Texture3D.");
+                            return;
+                        }
                     }
 
-                    pos += mipSizes[m];
+                    for (int m = 0; m < max; m++) {
+                        final int width = Math.max(1, image.getWidth() >> m);
+                        final int height = type != Type.OneDimensional ? Math.max(1, image.getHeight() >> m) : 0;
+                        final int depth = type == Type.ThreeDimensional ? Math.max(1, image.getDepth() >> m) : 0;
+
+                        data.position(pos);
+                        data.limit(pos + mipSizes[m]);
+
+                        switch (type) {
+                            case TwoDimensional:
+                                if (JoglTextureUtil.isCompressedType(image.getFormat())) {
+                                    gl.glCompressedTexImage2D(GL.GL_TEXTURE_2D, m, JoglTextureUtil
+                                            .getGLInternalFormat(image.getFormat()), width, height, hasBorder ? 1 : 0,
+                                            mipSizes[m], data);
+                                } else {
+                                    gl.glTexImage2D(GL.GL_TEXTURE_2D, m, JoglTextureUtil.getGLInternalFormat(image
+                                            .getFormat()), width, height, hasBorder ? 1 : 0, JoglTextureUtil
+                                            .getGLPixelFormat(image.getFormat()), JoglTextureUtil
+                                            .getGLPixelDataType(image.getFormat()), data);
+                                }
+                                break;
+                            case OneDimensional:
+                                if (JoglTextureUtil.isCompressedType(image.getFormat())) {
+                                    gl.glCompressedTexImage1D(GL.GL_TEXTURE_1D, m, JoglTextureUtil
+                                            .getGLInternalFormat(image.getFormat()), width, hasBorder ? 1 : 0,
+                                            mipSizes[m], data);
+                                } else {
+                                    gl.glTexImage1D(GL.GL_TEXTURE_1D, m, JoglTextureUtil.getGLInternalFormat(image
+                                            .getFormat()), width, hasBorder ? 1 : 0, JoglTextureUtil
+                                            .getGLPixelFormat(image.getFormat()), JoglTextureUtil
+                                            .getGLPixelDataType(image.getFormat()), data);
+                                }
+                                break;
+                            case ThreeDimensional:
+                                // already checked for support above...
+                                if (JoglTextureUtil.isCompressedType(image.getFormat())) {
+                                    gl.glCompressedTexImage3D(GL.GL_TEXTURE_3D, m, JoglTextureUtil
+                                            .getGLInternalFormat(image.getFormat()), width, height, depth,
+                                            hasBorder ? 1 : 0, mipSizes[m], data);
+                                } else {
+                                    gl.glTexImage3D(GL.GL_TEXTURE_3D, m, JoglTextureUtil.getGLInternalFormat(image
+                                            .getFormat()), width, height, depth, hasBorder ? 1 : 0, JoglTextureUtil
+                                            .getGLPixelFormat(image.getFormat()), JoglTextureUtil
+                                            .getGLPixelDataType(image.getFormat()), data);
+                                }
+                                break;
+                        }
+
+                        pos += mipSizes[m];
+                    }
                 }
-                data.clear();
+                if (data != null) {
+                    data.clear();
+                }
             }
         }
     }
