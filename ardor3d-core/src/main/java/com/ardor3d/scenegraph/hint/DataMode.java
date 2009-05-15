@@ -10,6 +10,6 @@
 
 package com.ardor3d.scenegraph.hint;
 
-public enum StaticType {
-    Static, Dynamic, Inherit;
+public enum DataMode {
+    Inherit, Arrays, VBO, VBOInterleaved;
 }

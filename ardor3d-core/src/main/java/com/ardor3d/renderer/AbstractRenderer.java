@@ -94,4 +94,27 @@ public abstract class AbstractRenderer implements Renderer {
     }
 
     protected abstract void doApplyState(RenderState state);
+
+    protected void addStats(final IndexMode indexMode, final int vertCount) {
+        final int primCount = IndexMode.getPrimitiveCount(indexMode, vertCount);
+        switch (indexMode) {
+            case Triangles:
+            case TriangleFan:
+            case TriangleStrip:
+                StatCollector.addStat(StatType.STAT_TRIANGLE_COUNT, primCount);
+                break;
+            case Lines:
+            case LineLoop:
+            case LineStrip:
+                StatCollector.addStat(StatType.STAT_LINE_COUNT, primCount);
+                break;
+            case Points:
+                StatCollector.addStat(StatType.STAT_POINT_COUNT, primCount);
+                break;
+            case Quads:
+            case QuadStrip:
+                StatCollector.addStat(StatType.STAT_QUAD_COUNT, primCount);
+                break;
+        }
+    }
 }

@@ -21,7 +21,7 @@ import com.ardor3d.renderer.queue.RenderBucketType;
 import com.ardor3d.renderer.state.BlendState;
 import com.ardor3d.renderer.state.MaterialState;
 import com.ardor3d.scenegraph.Mesh;
-import com.ardor3d.scenegraph.VBOInfo;
+import com.ardor3d.scenegraph.hint.DataMode;
 
 /**
  * <code>ShadowVolume</code> Represents the shadow volume mesh for a light and an occluder model
@@ -56,7 +56,8 @@ public class ShadowVolume extends Mesh {
         }
 
         // It will change so make sure VBO is off
-        setVBOInfo(new VBOInfo(false));
+        // TODO: Maybe change to Dynamic VBO?
+        getSceneHints().setDataMode(DataMode.Arrays);
 
         // It will not use the renderqueue, so turn that off:
         getSceneHints().setRenderBucketType(RenderBucketType.Skip);

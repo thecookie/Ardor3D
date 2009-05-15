@@ -30,7 +30,7 @@ import com.ardor3d.renderer.state.CullState;
 import com.ardor3d.renderer.state.TextureState;
 import com.ardor3d.scenegraph.Mesh;
 import com.ardor3d.scenegraph.Spatial;
-import com.ardor3d.scenegraph.VBOInfo;
+import com.ardor3d.scenegraph.hint.DataMode;
 import com.ardor3d.scenegraph.hint.LightCombineMode;
 import com.ardor3d.scenegraph.shape.Sphere;
 import com.ardor3d.ui.text.BasicText;
@@ -104,17 +104,15 @@ public class VBOSpeedExample extends ExampleBase {
                     t.setText("[SPACE] VBO on");
                     for (final Spatial spatial : _root.getChildren()) {
                         if (spatial instanceof Mesh) {
-                            final VBOInfo vboInfo = new VBOInfo(true);
-                            vboInfo.setVBOIndexEnabled(true);
-                            // vboInfo.setVBOInterleavedEnabled(true);
-                            ((Mesh) spatial).setVBOInfo(vboInfo);
+                            spatial.getSceneHints().setDataMode(DataMode.VBO);
+                            // spatial.getSceneHints().setDataMode(DataMode.VBOInterleaved);
                         }
                     }
                 } else {
                     t.setText("[SPACE] VBO off");
                     for (final Spatial spatial : _root.getChildren()) {
                         if (spatial instanceof Mesh) {
-                            ((Mesh) spatial).setVBOInfo(null);
+                            spatial.getSceneHints().setDataMode(DataMode.Arrays);
                         }
                     }
                 }

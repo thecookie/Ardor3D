@@ -23,14 +23,9 @@ import com.ardor3d.util.export.Savable;
 public class SceneHints implements Savable {
 
     /**
-     * A hint as to how a subset of the scenegraph will be used.
+     * How we want the data for a subset of the scenegraph to be sent to the card.
      */
-    protected StaticType _staticHint = StaticType.Inherit;
-
-    /**
-     * How we want a subset of the scenegraph to be compiled.
-     */
-    protected CompileType _compileHint = CompileType.Inherit;
+    protected DataMode _dataMode = DataMode.Inherit;
 
     /**
      * A flag indicating how normals should be treated by the renderer.
@@ -77,8 +72,7 @@ public class SceneHints implements Savable {
     }
 
     public void set(final SceneHints sceneHints) {
-        _staticHint = sceneHints._staticHint;
-        _compileHint = sceneHints._compileHint;
+        _dataMode = sceneHints._dataMode;
         _normalsMode = sceneHints._normalsMode;
         _cullHint = sceneHints._cullHint;
         _lightCombineMode = sceneHints._lightCombineMode;
@@ -95,66 +89,32 @@ public class SceneHints implements Savable {
      * 
      * @return The normals mode to use.
      */
-    public StaticType getStaticType() {
-        if (_staticHint != StaticType.Inherit) {
-            return _staticHint;
+    public DataMode getDataMode() {
+        if (_dataMode != DataMode.Inherit) {
+            return _dataMode;
         }
 
         final Hintable parent = _source.getParentHintable();
         if (parent != null) {
-            return parent.getSceneHints().getStaticType();
+            return parent.getSceneHints().getDataMode();
         }
 
-        return StaticType.Dynamic;
+        return DataMode.Arrays;
     }
 
     /**
-     * @return the exact statics type set.
+     * @return the exact data mode set.
      */
-    public StaticType getLocalStaticType() {
-        return _staticHint;
+    public DataMode getLocalDataMode() {
+        return _dataMode;
     }
 
     /**
      * @param type
-     *            the new static type to set on this SceneHints
+     *            the new data mode to set on this SceneHints
      */
-    public void setStaticType(final StaticType type) {
-        _staticHint = type;
-    }
-
-    /**
-     * Returns the normals mode. If the mode is set to inherit, then we get its normals mode from the given source's
-     * hintable parent. If no parent, we'll default to NormalizeIfScaled.
-     * 
-     * @return The normals mode to use.
-     */
-    public CompileType getCompileType() {
-        if (_compileHint != CompileType.Inherit) {
-            return _compileHint;
-        }
-
-        final Hintable parent = _source.getParentHintable();
-        if (parent != null) {
-            return parent.getSceneHints().getCompileType();
-        }
-
-        return CompileType.BestGuess;
-    }
-
-    /**
-     * @return the exact compile type set.
-     */
-    public CompileType getLocalCompileType() {
-        return _compileHint;
-    }
-
-    /**
-     * @param type
-     *            the new compile type to set on this SceneHints
-     */
-    public void seCompileType(final CompileType type) {
-        _compileHint = type;
+    public void setDataMode(final DataMode type) {
+        _dataMode = type;
     }
 
     /**
@@ -437,8 +397,7 @@ public class SceneHints implements Savable {
         _textureCombineMode = capsule.readEnum("textureCombineMode", TextureCombineMode.class,
                 TextureCombineMode.Inherit);
         _normalsMode = capsule.readEnum("normalsMode", NormalsMode.class, NormalsMode.Inherit);
-        _staticHint = capsule.readEnum("staticHint", StaticType.class, StaticType.Inherit);
-        _compileHint = capsule.readEnum("compileHint", CompileType.class, CompileType.Inherit);
+        _dataMode = capsule.readEnum("dataMode", DataMode.class, DataMode.Inherit);
         final PickingHint[] pickHints = capsule.readEnumArray("pickingHints", PickingHint.class, null);
         _pickingHints.clear();
         if (pickHints != null) {
@@ -461,8 +420,7 @@ public class SceneHints implements Savable {
         capsule.write(_lightCombineMode, "lightCombineMode", LightCombineMode.Inherit);
         capsule.write(_textureCombineMode, "textureCombineMode", TextureCombineMode.Inherit);
         capsule.write(_normalsMode, "normalsMode", NormalsMode.Inherit);
-        capsule.write(_staticHint, "staticHint", StaticType.Inherit);
-        capsule.write(_compileHint, "compileHint", CompileType.Inherit);
+        capsule.write(_dataMode, "dataMode", DataMode.Inherit);
         capsule.write(_pickingHints.toArray(new PickingHint[] {}), "pickingHints");
     }
 }

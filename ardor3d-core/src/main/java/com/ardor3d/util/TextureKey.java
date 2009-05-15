@@ -16,6 +16,7 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.ardor3d.image.Image;
 import com.ardor3d.image.Texture;
@@ -39,7 +40,7 @@ final public class TextureKey implements Savable {
     protected Image.Format _format = Image.Format.Guess;
     protected String _fileType;
     protected Texture.MinificationFilter _minFilter = MinificationFilter.Trilinear;
-    protected final WeakHashMap<Object, Integer> _idCache = new WeakHashMap<Object, Integer>();
+    protected final transient WeakHashMap<Object, Integer> _idCache = new WeakHashMap<Object, Integer>();
     protected int _code = Integer.MAX_VALUE;
 
     protected static final List<TextureKey> _keyCache = new ArrayList<TextureKey>();
@@ -47,7 +48,7 @@ final public class TextureKey implements Savable {
     /** DO NOT USE. FOR SAVABLE USE ONLY */
     public TextureKey() {}
 
-    private static int _uniqueTK = Integer.MIN_VALUE;
+    private static AtomicInteger _uniqueTK = new AtomicInteger(Integer.MIN_VALUE);
 
     /**
      * Get a new unique TextureKey. This is meant for use by RTT and other situations where we know we are making a
@@ -58,11 +59,12 @@ final public class TextureKey implements Savable {
      * @return the new TextureKey
      */
     public static synchronized TextureKey getRTTKey(final MinificationFilter minFilter) {
-        _uniqueTK++;
-        if (_uniqueTK == Integer.MAX_VALUE) {
-            _uniqueTK = Integer.MIN_VALUE;
+        int val = _uniqueTK.addAndGet(1);
+        if (val == Integer.MAX_VALUE) {
+            _uniqueTK.set(Integer.MIN_VALUE);
+            val = Integer.MIN_VALUE;
         }
-        return getKey(null, false, Format.Guess, "" + _uniqueTK, minFilter);
+        return getKey(null, false, Format.Guess, "" + val, minFilter);
     }
 
     public static synchronized TextureKey getKey(final URL location, final boolean flipped,

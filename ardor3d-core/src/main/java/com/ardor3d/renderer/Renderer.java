@@ -13,7 +13,6 @@ package com.ardor3d.renderer;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
 import java.util.List;
 
 import com.ardor3d.image.Image;
@@ -26,10 +25,10 @@ import com.ardor3d.renderer.queue.RenderQueue;
 import com.ardor3d.renderer.state.RenderState;
 import com.ardor3d.renderer.state.RenderState.StateType;
 import com.ardor3d.scenegraph.FloatBufferData;
+import com.ardor3d.scenegraph.IntBufferData;
 import com.ardor3d.scenegraph.Mesh;
 import com.ardor3d.scenegraph.Renderable;
 import com.ardor3d.scenegraph.Spatial;
-import com.ardor3d.scenegraph.VBOInfo;
 import com.ardor3d.scenegraph.hint.NormalsMode;
 import com.ardor3d.util.Ardor3dException;
 
@@ -194,17 +193,6 @@ public interface Renderer {
     boolean checkAndAdd(Spatial s);
 
     /**
-     * Checks the VBO cache to see if this Buffer is mapped to a VBO-id. If it does the mapping will be removed from the
-     * cache and the VBO with the VBO-id found will be deleted.
-     * 
-     * If no mapped VBO-id is found, this method does not do anything else.
-     * 
-     * @param buffer
-     *            The Buffer who's associated VBO should be deleted.
-     */
-    void deleteVBO(Buffer buffer);
-
-    /**
      * Attempts to delete the VBO with this VBO id. Ignores ids < 1.
      * 
      * @param vboid
@@ -212,26 +200,8 @@ public interface Renderer {
     void deleteVBO(int vboid);
 
     /**
-     * Clears all entries from the VBO cache. Does not actually delete any VBO buffer, only all mappings between Buffers
-     * and VBO-ids.
-     * 
+     * Unbind the current VBO elements.
      */
-    void clearVBOCache();
-
-    /**
-     * Removes the mapping between this Buffer and it's VBO-id. Does not actually delete the VBO. <br>
-     * This method is useful if you want to use the same Buffer to create several VBOs. After a VBO is created for this
-     * Buffer, update the Buffer and remove it from the VBO cache. You can now reuse the same buffer with another Mesh
-     * object. <br>
-     * If no association is found, this method does nothing.
-     * 
-     * @param buffer
-     *            The nio Buffer whose associated VBO should be deleted.
-     * @return An int wrapped in an Integer object that's the VBO-id of the VBO previously mapped to this Buffer, or
-     *         null is no mapping existed.
-     */
-    Integer removeFromVBOCache(Buffer buffer);
-
     void unbindVBO();
 
     /**
@@ -322,27 +292,27 @@ public interface Renderer {
 
     void setupInterleavedData(final FloatBuffer interleavedBuffer, InterleavedFormat format);
 
-    void drawElements(final IntBuffer indices, final int[] indexLengths, final IndexMode[] indexModes);
+    void drawElements(final IntBufferData indices, final int[] indexLengths, final IndexMode[] indexModes);
 
-    void drawArrays(final FloatBuffer vertexBuffer, final int[] indexLengths, final IndexMode[] indexModes);
+    void drawArrays(final FloatBufferData vertexBuffer, final int[] indexLengths, final IndexMode[] indexModes);
 
     // TODO: VBO
-    void setupVertexData(final FloatBufferData vertexCoords, final VBOInfo vbo);
+    void setupVertexDataVBO(final FloatBufferData vertexCoords);
 
-    void setupNormalData(final FloatBufferData normalCoords, final NormalsMode normalMode,
-            final Transform worldTransform, final VBOInfo vbo);
+    void setupNormalDataVBO(final FloatBufferData normalCoords, final NormalsMode normalMode,
+            final Transform worldTransform);
 
-    void setupColorData(final FloatBufferData colorCoords, final VBOInfo vbo, final ColorRGBA defaultColor);
+    void setupColorDataVBO(final FloatBufferData colorCoords, final ColorRGBA defaultColor);
 
-    void setupFogData(final FloatBufferData fogCoords, final VBOInfo vbo);
+    void setupFogDataVBO(final FloatBufferData fogCoords);
 
-    void setupTextureData(final List<FloatBufferData> textureCoords, final VBOInfo vbo);
+    void setupTextureDataVBO(final List<FloatBufferData> textureCoords);
 
-    void setupInterleavedData(final FloatBuffer interleavedBuffer, InterleavedFormat format, final VBOInfo vbo);
+    void setupInterleavedDataVBO(final FloatBuffer interleavedBuffer, InterleavedFormat format);
 
-    void setupInterleavedData(final Mesh mesh);
+    void setupInterleavedDataVBO(final Mesh mesh);
 
-    void drawElements(final IntBuffer indices, final VBOInfo vbo, final int[] indexLengths, final IndexMode[] indexModes);
+    void drawElementsVBO(final IntBufferData indices, final int[] indexLengths, final IndexMode[] indexModes);
 
     // TODO: Display List
     void renderDisplayList(final int displayListID);
