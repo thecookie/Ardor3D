@@ -17,6 +17,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
+import java.util.WeakHashMap;
 
 import com.ardor3d.bounding.BoundingVolume;
 import com.ardor3d.math.Matrix3;
@@ -28,6 +29,8 @@ import com.ardor3d.math.type.ReadOnlyQuaternion;
 import com.ardor3d.math.type.ReadOnlyTransform;
 import com.ardor3d.math.type.ReadOnlyVector3;
 import com.ardor3d.renderer.Camera;
+import com.ardor3d.renderer.ContextManager;
+import com.ardor3d.renderer.RenderContext;
 import com.ardor3d.renderer.Renderer;
 import com.ardor3d.renderer.state.RenderState;
 import com.ardor3d.renderer.state.RenderState.StateType;
@@ -42,6 +45,7 @@ import com.ardor3d.util.export.Ardor3DImporter;
 import com.ardor3d.util.export.InputCapsule;
 import com.ardor3d.util.export.OutputCapsule;
 import com.ardor3d.util.export.Savable;
+import com.ardor3d.util.scenegraph.RenderDelegate;
 import com.google.common.collect.Maps;
 
 public abstract class Spatial implements Cloneable, Savable, Hintable {
@@ -83,6 +87,10 @@ public abstract class Spatial implements Cloneable, Savable, Hintable {
     /** The hints for Ardor3D's use when evaluating and rendering this spatial. */
     protected final SceneHints _sceneHints;
 
+    /** The render delegates to use for this Spatial, mapped by glContext reference. */
+    protected final transient WeakHashMap<Object, RenderDelegate> _delegateMap = new WeakHashMap<Object, RenderDelegate>();
+    private static final Object defaultDelegateRef = new Object();
+
     /**
      * Constructs a new Spatial. Initializes the transform fields.
      */
@@ -120,6 +128,37 @@ public abstract class Spatial implements Cloneable, Savable, Hintable {
      */
     public void setName(final String name) {
         _name = name;
+    }
+
+    /**
+     * 
+     * @param delegate
+     *            the new delegate, or null for default behavior
+     * @param glContextRef
+     *            if null, the delegate is set as the default render delegate for this spatial. Otherwise, the delegate
+     *            is used when this Spatial is rendered in a RenderContext tied to the given glContextRef.
+     */
+    public void setRenderDelegate(final RenderDelegate delegate, final Object glContextRef) {
+        if (glContextRef == null) {
+            _delegateMap.put(defaultDelegateRef, delegate);
+        } else {
+            _delegateMap.put(glContextRef, delegate);
+        }
+    }
+
+    /**
+     * 
+     * @param glContextRef
+     *            if null, retrieve the default render delegate for this spatial. Otherwise, retrieve the delegate used
+     *            when this Spatial is rendered in a RenderContext tied to the given glContextRef.
+     * @return delegate as described.
+     */
+    public RenderDelegate getRenderDelegate(final Object glContextRef) {
+        if (glContextRef == null) {
+            return _delegateMap.get(defaultDelegateRef);
+        } else {
+            return _delegateMap.get(glContextRef);
+        }
     }
 
     /**
@@ -514,10 +553,34 @@ public abstract class Spatial implements Cloneable, Savable, Hintable {
      * <code>draw</code> abstract method that handles drawing data to the renderer if it is geometry and passing the
      * call to it's children if it is a node.
      * 
-     * @param r
+     * @param renderer
      *            the renderer used for display.
      */
-    public abstract void draw(Renderer r);
+    public abstract void draw(final Renderer renderer);
+
+    /**
+     * Grab the render delegate for this spatial based on the currently set RenderContext.
+     * 
+     * @return the delegate or null if a delegate was not found.
+     */
+    protected RenderDelegate getCurrentRenderDelegate() {
+        // short circuit... ignore if no delegates at all.
+        if (_delegateMap.size() == 0) {
+            return null;
+        }
+
+        // otherwise... grab our current context
+        final RenderContext context = ContextManager.getCurrentContext();
+
+        // get the delegate for this context
+        RenderDelegate delegate = getRenderDelegate(context.getGlContextRep());
+        // if none, check for a default delegate.
+        if (delegate == null) {
+            delegate = getRenderDelegate(null);
+        }
+
+        return delegate;
+    }
 
     public void updateGeometricState(final double time) {
         updateGeometricState(time, true);
@@ -1014,5 +1077,4 @@ public abstract class Spatial implements Cloneable, Savable, Hintable {
             capsule.writeSavableList(list, "controllers", null);
         }
     }
-
 }

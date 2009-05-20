@@ -41,6 +41,7 @@ import com.ardor3d.util.export.Ardor3DImporter;
 import com.ardor3d.util.export.InputCapsule;
 import com.ardor3d.util.export.OutputCapsule;
 import com.ardor3d.util.geom.BufferUtils;
+import com.ardor3d.util.scenegraph.RenderDelegate;
 import com.ardor3d.util.stat.StatCollector;
 import com.ardor3d.util.stat.StatType;
 
@@ -369,7 +370,12 @@ public class Mesh extends Spatial implements Renderable {
             }
         }
 
-        r.draw((Renderable) this);
+        final RenderDelegate delegate = getCurrentRenderDelegate();
+        if (delegate == null) {
+            r.draw((Renderable) this);
+        } else {
+            delegate.render(this, r);
+        }
     }
 
     /**
