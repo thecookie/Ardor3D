@@ -72,12 +72,12 @@ public abstract class AbstractRenderer implements Renderer {
         // first look up in enforced states
         RenderState tempState = context.getEnforcedState(type);
 
-        // Not there? Look in the states we receive
+        // Not there? Use the state we received
         if (tempState == null) {
             tempState = state;
         }
 
-        // Still missing? Use our default states.
+        // Still null? Use our default state
         if (tempState == null) {
             tempState = defaultStateList.get(type);
         }
