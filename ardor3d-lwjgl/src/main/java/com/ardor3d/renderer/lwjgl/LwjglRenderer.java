@@ -503,7 +503,7 @@ public class LwjglRenderer extends AbstractRenderer {
         renderable.render(this);
     }
 
-    public boolean doTransforms(final Transform transform) {
+    public boolean doTransforms(final ReadOnlyTransform transform) {
         // set world matrix
         if (!transform.isIdentity()) {
             synchronized (_transformMatrix) {
@@ -1168,14 +1168,6 @@ public class LwjglRenderer extends AbstractRenderer {
         }
     }
 
-    // TODO: Display List
-    public void renderDisplayList(final int displayListID) {
-        GL11.glCallList(displayListID);
-
-        // invalidate "current arrays"
-        reset();
-    }
-
     public int makeVBOId(final RendererRecord rendRecord) {
         _idBuff.rewind();
         ARBBufferObject.glGenBuffersARB(_idBuff);
@@ -1524,5 +1516,36 @@ public class LwjglRenderer extends AbstractRenderer {
 
     public void loadTexture(final Texture texture, final int unit) {
         LwjglTextureStateUtil.load(texture, unit);
+    }
+
+    /**
+     * Start a new display list. All further renderer commands that can be stored in a display list are part of this new
+     * list until {@link #endDisplayList()} is called.
+     * 
+     * @return id of new display list
+     */
+    public int startDisplayList() {
+        final int id = GL11.glGenLists(1);
+
+        GL11.glNewList(id, GL11.GL_COMPILE);
+
+        return id;
+    }
+
+    /**
+     * Ends a display list. Will likely cause an OpenGL exception is a display list is not currently being generated.
+     */
+    public void endDisplayList() {
+        GL11.glEndList();
+    }
+
+    /**
+     * Draw the given display list.
+     */
+    public void renderDisplayList(final int displayListID) {
+        GL11.glCallList(displayListID);
+
+        // invalidate "current arrays"
+        reset();
     }
 }

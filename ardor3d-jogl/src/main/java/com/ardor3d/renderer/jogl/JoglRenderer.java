@@ -31,6 +31,7 @@ import com.ardor3d.math.ColorRGBA;
 import com.ardor3d.math.Matrix4;
 import com.ardor3d.math.Transform;
 import com.ardor3d.math.type.ReadOnlyColorRGBA;
+import com.ardor3d.math.type.ReadOnlyTransform;
 import com.ardor3d.math.type.ReadOnlyVector3;
 import com.ardor3d.renderer.AbstractRenderer;
 import com.ardor3d.renderer.Camera;
@@ -528,7 +529,7 @@ public class JoglRenderer extends AbstractRenderer {
         renderable.render(this);
     }
 
-    public boolean doTransforms(final Transform transform) {
+    public boolean doTransforms(final ReadOnlyTransform transform) {
         final GL gl = GLU.getCurrentGL();
 
         // set world matrix
@@ -1044,16 +1045,6 @@ public class JoglRenderer extends AbstractRenderer {
         }
     }
 
-    // TODO: Display List
-    public void renderDisplayList(final int displayListID) {
-        final GL gl = GLU.getCurrentGL();
-
-        gl.glCallList(displayListID);
-
-        // invalidate "current arrays"
-        reset();
-    }
-
     public int makeVBOId(final RendererRecord rendRecord) {
         final GL gl = GLU.getCurrentGL();
 
@@ -1408,5 +1399,40 @@ public class JoglRenderer extends AbstractRenderer {
 
     public void loadTexture(final Texture texture, final int unit) {
         JoglTextureStateUtil.load(texture, unit);
+    }
+
+    /**
+     * Start a new display list. All further renderer commands that can be stored in a display list are part of this new
+     * list until {@link #endDisplayList()} is called.
+     * 
+     * @return id of new display list
+     */
+    public int startDisplayList() {
+        final GL gl = GLU.getCurrentGL();
+
+        final int id = gl.glGenLists(1);
+
+        gl.glNewList(id, GL.GL_COMPILE);
+
+        return id;
+    }
+
+    /**
+     * Ends a display list. Will likely cause an OpenGL exception is a display list is not currently being generated.
+     */
+    public void endDisplayList() {
+        GLU.getCurrentGL().glEndList();
+    }
+
+    /**
+     * Draw the given display list.
+     */
+    public void renderDisplayList(final int displayListID) {
+        final GL gl = GLU.getCurrentGL();
+
+        gl.glCallList(displayListID);
+
+        // invalidate "current arrays"
+        reset();
     }
 }

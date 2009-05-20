@@ -21,6 +21,7 @@ import com.ardor3d.image.Image.Format;
 import com.ardor3d.math.ColorRGBA;
 import com.ardor3d.math.Transform;
 import com.ardor3d.math.type.ReadOnlyColorRGBA;
+import com.ardor3d.math.type.ReadOnlyTransform;
 import com.ardor3d.renderer.queue.RenderQueue;
 import com.ardor3d.renderer.state.RenderState;
 import com.ardor3d.renderer.state.RenderState.StateType;
@@ -268,7 +269,7 @@ public interface Renderer {
      * @param transform
      *            transform to apply.
      */
-    boolean doTransforms(final Transform transform);
+    boolean doTransforms(final ReadOnlyTransform transform);
 
     /**
      * <code>undoTransforms</code> reverts the latest transform.
@@ -385,4 +386,17 @@ public interface Renderer {
     void loadTexture(Texture texture, int unit);
 
     void deleteTexture(Texture texture);
+
+    /**
+     * Start a new display list. All further renderer commands that can be stored in a display list are part of this new
+     * list until {@link #endDisplayList()} is called.
+     * 
+     * @return id of new display list
+     */
+    int startDisplayList();
+
+    /**
+     * Ends a display list. Will likely cause an OpenGL exception is a display list is not currently being generated.
+     */
+    void endDisplayList();
 }
