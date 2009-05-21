@@ -1155,7 +1155,7 @@ public class LwjglRenderer extends AbstractRenderer {
     }
 
     private int getGLVBOAccessMode(final VBOAccessMode vboAccessMode) {
-        int glMode = GL11.GL_TRIANGLES;
+        int glMode = ARBBufferObject.GL_STATIC_DRAW_ARB;
         switch (vboAccessMode) {
             case StaticDraw:
                 glMode = ARBBufferObject.GL_STATIC_DRAW_ARB;

@@ -30,8 +30,6 @@ import com.ardor3d.renderer.state.CullState;
 import com.ardor3d.renderer.state.MaterialState;
 import com.ardor3d.renderer.state.TextureState;
 import com.ardor3d.renderer.state.MaterialState.ColorMaterial;
-import com.ardor3d.scenegraph.Mesh;
-import com.ardor3d.scenegraph.Spatial;
 import com.ardor3d.scenegraph.hint.DataMode;
 import com.ardor3d.scenegraph.hint.LightCombineMode;
 import com.ardor3d.scenegraph.shape.Sphere;
@@ -42,7 +40,7 @@ import com.google.inject.Inject;
 
 public class VBOSpeedExample extends ExampleBase {
 
-    private boolean useVBO = false;
+    private int vboMode = 0;
 
     public static void main(final String[] args) {
         start(VBOSpeedExample.class);
@@ -72,7 +70,7 @@ public class VBOSpeedExample extends ExampleBase {
     protected void initExample() {
         _canvas.setTitle("VBOSpeedExample");
 
-        final BasicText t = BasicText.createDefaultTextLabel("Text", "[SPACE] VBO off");
+        final BasicText t = BasicText.createDefaultTextLabel("Text", "[SPACE] VBO Off");
         t.getSceneHints().setRenderBucketType(RenderBucketType.Ortho);
         t.getSceneHints().setLightCombineMode(LightCombineMode.Off);
         t.setTranslation(new Vector3(0, 20, 0));
@@ -106,22 +104,16 @@ public class VBOSpeedExample extends ExampleBase {
 
         _logicalLayer.registerTrigger(new InputTrigger(new KeyPressedCondition(Key.SPACE), new TriggerAction() {
             public void perform(final Canvas source, final InputState inputState, final double tpf) {
-                useVBO = !useVBO;
-                if (useVBO) {
-                    t.setText("[SPACE] VBO on");
-                    for (final Spatial spatial : _root.getChildren()) {
-                        if (spatial instanceof Mesh) {
-                            spatial.getSceneHints().setDataMode(DataMode.VBO);
-                            // spatial.getSceneHints().setDataMode(DataMode.VBOInterleaved);
-                        }
-                    }
-                } else {
-                    t.setText("[SPACE] VBO off");
-                    for (final Spatial spatial : _root.getChildren()) {
-                        if (spatial instanceof Mesh) {
-                            spatial.getSceneHints().setDataMode(DataMode.Arrays);
-                        }
-                    }
+                vboMode = (vboMode + 1) % 3;
+                if (vboMode == 0) {
+                    t.setText("[SPACE] VBO Off");
+                    _root.getSceneHints().setDataMode(DataMode.Arrays);
+                } else if (vboMode == 1) {
+                    t.setText("[SPACE] VBO On");
+                    _root.getSceneHints().setDataMode(DataMode.VBO);
+                } else if (vboMode == 2) {
+                    t.setText("[SPACE] VBO Interleaved On");
+                    _root.getSceneHints().setDataMode(DataMode.VBOInterleaved);
                 }
             }
         }));

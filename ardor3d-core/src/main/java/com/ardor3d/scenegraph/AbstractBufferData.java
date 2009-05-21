@@ -22,12 +22,16 @@ public abstract class AbstractBufferData<T extends Buffer> {
     /** Buffer holding the data. */
     protected T _buffer;
 
-    /** Access mode of the buffer when using Vertex Buffer Objects */
+    /** Access mode of the buffer when using Vertex Buffer Objects. */
     public enum VBOAccessMode {
         StaticDraw, StaticCopy, StaticRead, StreamDraw, StreamCopy, StreamRead, DynamicDraw, DynamicCopy, DynamicRead
     }
 
+    /** VBO Access mode for this buffer. */
     protected VBOAccessMode vboAccessMode = VBOAccessMode.StaticDraw;
+
+    /** Flag for notifying the renderer that the VBO buffer needs to be updated. */
+    protected boolean needsRefresh = true;
 
     /**
      * Gets the count.
@@ -99,5 +103,13 @@ public abstract class AbstractBufferData<T extends Buffer> {
 
     public void setVboAccessMode(final VBOAccessMode vboAccessMode) {
         this.vboAccessMode = vboAccessMode;
+    }
+
+    public boolean isNeedsRefresh() {
+        return needsRefresh;
+    }
+
+    public void setNeedsRefresh(final boolean needsRefresh) {
+        this.needsRefresh = needsRefresh;
     }
 }
