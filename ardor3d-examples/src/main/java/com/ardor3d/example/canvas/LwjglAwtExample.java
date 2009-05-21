@@ -27,6 +27,7 @@ import com.ardor3d.example.ExampleBase;
 import com.ardor3d.example.Exit;
 import com.ardor3d.framework.ArdorModule;
 import com.ardor3d.framework.Canvas;
+import com.ardor3d.framework.DisplaySettings;
 import com.ardor3d.framework.FrameHandler;
 import com.ardor3d.framework.awt.AwtCanvas;
 import com.ardor3d.framework.lwjgl.LwjglCanvasRenderer;
@@ -149,7 +150,8 @@ public class LwjglAwtExample {
             final FrameHandler frameWork) throws Exception {
         final LwjglCanvasRenderer canvasRenderer = new LwjglCanvasRenderer(scene);
 
-        final AwtCanvas theCanvas = new AwtCanvas();
+        final DisplaySettings settings = new DisplaySettings(1, 1, 0, 0, 0, 16, 0, 0, false, false);
+        final AwtCanvas theCanvas = new AwtCanvas(settings);
 
         theCanvas.setCanvasRenderer(canvasRenderer);
         frame.add(theCanvas);
