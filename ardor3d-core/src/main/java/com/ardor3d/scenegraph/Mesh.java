@@ -231,8 +231,13 @@ public class Mesh extends Spatial implements Renderable {
                     renderer.applyDefaultColor(_defaultColor);
                 }
                 renderer.applyNormalsMode(getSceneHints().getNormalsMode(), _worldTransform);
-                renderer.setupInterleavedDataVBO(_meshData.getVertexCoords(), _meshData.getNormalCoords(), _meshData
-                        .getColorCoords(), _meshData.getTextureCoords());
+                // Make sure we have a FBD to hold our id.
+                if (_meshData.getInterleavedData() == null) {
+                    final FloatBufferData interleaved = new FloatBufferData(FloatBuffer.allocate(0), 1);
+                    _meshData.setInterleavedData(interleaved);
+                }
+                renderer.setupInterleavedDataVBO(_meshData.getInterleavedData(), _meshData.getVertexCoords(), _meshData
+                        .getNormalCoords(), _meshData.getColorCoords(), _meshData.getTextureCoords());
             } else {
                 if (RENDER_VERTEX_ONLY) {
                     renderer.applyNormalsMode(NormalsMode.Off, null);
@@ -279,21 +284,17 @@ public class Mesh extends Spatial implements Renderable {
                 renderer.unbindVBO();
             }
 
-            if (_meshData.getInterleavedBuffer() != null) {
-                renderer.setupInterleavedData(_meshData.getInterleavedBuffer(), _meshData.getInterleavedFormat());
+            if (RENDER_VERTEX_ONLY) {
+                renderer.setupNormalData(null, NormalsMode.Off, null);
+                renderer.setupColorData(null, null);
+                renderer.setupTextureData(null);
             } else {
-                if (RENDER_VERTEX_ONLY) {
-                    renderer.setupNormalData(null, NormalsMode.Off, null);
-                    renderer.setupColorData(null, null);
-                    renderer.setupTextureData(null);
-                } else {
-                    renderer.setupNormalData(_meshData.getNormalCoords(), getSceneHints().getNormalsMode(),
-                            _worldTransform);
-                    renderer.setupColorData(_meshData.getColorCoords(), _defaultColor);
-                    renderer.setupTextureData(_meshData.getTextureCoords());
-                }
-                renderer.setupVertexData(_meshData.getVertexCoords());
+                renderer
+                        .setupNormalData(_meshData.getNormalCoords(), getSceneHints().getNormalsMode(), _worldTransform);
+                renderer.setupColorData(_meshData.getColorCoords(), _defaultColor);
+                renderer.setupTextureData(_meshData.getTextureCoords());
             }
+            renderer.setupVertexData(_meshData.getVertexCoords());
 
             if (_meshData.getIndexBuffer() != null) {
                 renderer.drawElements(_meshData.getIndices(), _meshData.getIndexLengths(), _meshData.getIndexModes());

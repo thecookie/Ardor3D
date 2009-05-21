@@ -12,7 +12,6 @@ package com.ardor3d.renderer;
 
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
 import java.util.List;
 
 import com.ardor3d.image.Image;
@@ -290,8 +289,6 @@ public interface Renderer {
 
     void setupTextureData(final List<FloatBufferData> textureCoords);
 
-    void setupInterleavedData(final FloatBuffer interleavedBuffer, InterleavedFormat format);
-
     void drawElements(final IntBufferData indices, final int[] indexLengths, final IndexMode[] indexModes);
 
     void drawArrays(final FloatBufferData vertexBuffer, final int[] indexLengths, final IndexMode[] indexModes);
@@ -311,8 +308,9 @@ public interface Renderer {
 
     void setupTextureDataVBO(final List<FloatBufferData> textureCoords);
 
-    void setupInterleavedDataVBO(final FloatBufferData vertexCoords, final FloatBufferData normalCoords,
-            final FloatBufferData colorCoords, final List<FloatBufferData> textureCoords);
+    void setupInterleavedDataVBO(final FloatBufferData interleaved, final FloatBufferData vertexCoords,
+            final FloatBufferData normalCoords, final FloatBufferData colorCoords,
+            final List<FloatBufferData> textureCoords);
 
     void drawElementsVBO(final IntBufferData indices, final int[] indexLengths, final IndexMode[] indexModes);
 

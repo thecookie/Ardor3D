@@ -22,7 +22,6 @@ import com.ardor3d.math.MathUtils;
 import com.ardor3d.math.Quaternion;
 import com.ardor3d.math.Vector3;
 import com.ardor3d.renderer.IndexMode;
-import com.ardor3d.renderer.InterleavedFormat;
 import com.ardor3d.renderer.RenderContext;
 import com.ardor3d.util.export.Ardor3DExporter;
 import com.ardor3d.util.export.Ardor3DImporter;
@@ -55,9 +54,8 @@ public class MeshData implements Cloneable, Savable {
     protected transient FloatBufferData _tangentCoords;
     protected transient List<FloatBufferData> _textureCoords = new ArrayList<FloatBufferData>(1);
 
-    /** Interleaved data. */
-    protected transient FloatBuffer _interleavedBuffer;
-    protected transient InterleavedFormat _interleavedFormat = InterleavedFormat.GL_V3F;
+    /** Interleaved data (for VBO id use). */
+    protected transient FloatBufferData _interleaved;
 
     /** Index data. */
     protected transient IntBufferData _indexBuffer;
@@ -384,7 +382,19 @@ public class MeshData implements Cloneable, Savable {
      * @return the interleaved buffer
      */
     public FloatBuffer getInterleavedBuffer() {
-        return _interleavedBuffer;
+        if (_interleaved == null) {
+            return null;
+        }
+        return _interleaved.getBuffer();
+    }
+
+    /**
+     * Gets the interleaved data.
+     * 
+     * @return the interleaved data
+     */
+    public FloatBufferData getInterleavedData() {
+        return _interleaved;
     }
 
     /**
@@ -393,27 +403,8 @@ public class MeshData implements Cloneable, Savable {
      * @param interleavedBuffer
      *            the interleaved buffer
      */
-    public void setInterleavedBuffer(final FloatBuffer interleavedBuffer) {
-        _interleavedBuffer = interleavedBuffer;
-    }
-
-    /**
-     * Gets the interleaved format.
-     * 
-     * @return the interleaved format
-     */
-    public InterleavedFormat getInterleavedFormat() {
-        return _interleavedFormat;
-    }
-
-    /**
-     * Sets the interleaved format.
-     * 
-     * @param interleavedFormat
-     *            the new interleaved format
-     */
-    public void setInterleavedFormat(final InterleavedFormat interleavedFormat) {
-        _interleavedFormat = interleavedFormat;
+    public void setInterleavedData(final FloatBufferData interleavedData) {
+        _interleaved = interleavedData;
     }
 
     /**
@@ -1109,7 +1100,7 @@ public class MeshData implements Cloneable, Savable {
         capsule.write(_tangentCoords, "tangentBuffer", null);
         capsule.writeSavableList(_textureCoords, "textureCoords", new ArrayList<FloatBufferData>(1));
         capsule.write(_indexBuffer, "indexBuffer", null);
-        capsule.write(_interleavedBuffer, "interleavedBuffer", null);
+        capsule.write(_interleaved, "interleaved", null);
         capsule.write(_indexLengths, "indexLengths", null);
         capsule.write(_indexModes, "indexModes");
     }
@@ -1125,7 +1116,7 @@ public class MeshData implements Cloneable, Savable {
         _tangentCoords = (FloatBufferData) capsule.readSavable("tangentBuffer", null);
         _textureCoords = capsule.readSavableList("textureCoords", new ArrayList<FloatBufferData>(1));
         _indexBuffer = (IntBufferData) capsule.readSavable("indexBuffer", null);
-        _interleavedBuffer = capsule.readFloatBuffer("interleavedBuffer", null);
+        _interleaved = (FloatBufferData) capsule.readSavable("interleaved", null);
         _indexLengths = capsule.readIntArray("indexLengths", null);
         _indexModes = capsule.readEnumArray("indexModes", IndexMode.class, new IndexMode[] { IndexMode.Triangles });
 
