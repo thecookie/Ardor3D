@@ -44,7 +44,6 @@ import com.ardor3d.renderer.ContextCapabilities;
 import com.ardor3d.renderer.ContextManager;
 import com.ardor3d.renderer.DrawBufferTarget;
 import com.ardor3d.renderer.IndexMode;
-import com.ardor3d.renderer.InterleavedFormat;
 import com.ardor3d.renderer.RenderContext;
 import com.ardor3d.renderer.queue.RenderBucketType;
 import com.ardor3d.renderer.queue.RenderQueue;
@@ -113,8 +112,6 @@ public class LwjglRenderer extends AbstractRenderer {
     private FloatBuffer _oldColorBuffer;
 
     private FloatBuffer _oldFogBuffer;
-
-    private FloatBuffer _oldInterleavedBuffer;
 
     private final FloatBuffer[] _oldTextureBuffers;
 
@@ -239,7 +236,7 @@ public class LwjglRenderer extends AbstractRenderer {
 
     // XXX: look more at this
     public void reset() {
-        _oldColorBuffer = _oldNormalBuffer = _oldVertexBuffer = _oldInterleavedBuffer = null;
+        _oldColorBuffer = _oldNormalBuffer = _oldVertexBuffer = null;
         Arrays.fill(_oldTextureBuffers, null);
     }
 
@@ -670,18 +667,6 @@ public class LwjglRenderer extends AbstractRenderer {
         }
     }
 
-    public void setupInterleavedData(final FloatBuffer interleavedBuffer, final InterleavedFormat format) {
-        if (_oldInterleavedBuffer != interleavedBuffer) {
-            interleavedBuffer.rewind();
-
-            final int glFormat = getGLInterleavedFormat(format);
-
-            GL11.glInterleavedArrays(glFormat, 0, interleavedBuffer);
-        }
-
-        _oldInterleavedBuffer = interleavedBuffer;
-    }
-
     public void drawElements(final IntBufferData indices, final int[] indexLengths, final IndexMode[] indexModes) {
         if (indices == null || indices.getBuffer() == null) {
             logger.severe("Missing indices for drawElements call without VBO");
@@ -727,7 +712,7 @@ public class LwjglRenderer extends AbstractRenderer {
             return -1;
         }
 
-        int vboID = data.getVBOID(context);
+        int vboID = data.getVBOID(context.getGlContextRep());
         if (vboID > 0) {
             return vboID;
         }
@@ -737,7 +722,7 @@ public class LwjglRenderer extends AbstractRenderer {
             // XXX: should we be rewinding? Maybe make that the programmer's responsibility.
             dataBuffer.rewind();
             vboID = makeVBOId(rendRecord);
-            data.setVBOID(context, vboID);
+            data.setVBOID(context.getGlContextRep(), vboID);
 
             rendRecord.invalidateVBO();
             LwjglRendererUtil.setBoundVBO(rendRecord, vboID);
@@ -754,7 +739,7 @@ public class LwjglRenderer extends AbstractRenderer {
             return -1;
         }
 
-        int vboID = data.getVBOID(context);
+        int vboID = data.getVBOID(context.getGlContextRep());
         if (vboID > 0) {
             return vboID;
         }
@@ -764,7 +749,7 @@ public class LwjglRenderer extends AbstractRenderer {
             // XXX: should we be rewinding? Maybe make that the programmer's responsibility.
             dataBuffer.rewind();
             vboID = makeVBOId(rendRecord);
-            data.setVBOID(context, vboID);
+            data.setVBOID(context.getGlContextRep(), vboID);
 
             rendRecord.invalidateVBO();
             LwjglRendererUtil.setBoundVBO(rendRecord, vboID);
@@ -892,17 +877,18 @@ public class LwjglRenderer extends AbstractRenderer {
         }
     }
 
-    public void setupInterleavedDataVBO(final FloatBufferData vertexCoords, final FloatBufferData normalCoords,
-            final FloatBufferData colorCoords, final List<FloatBufferData> textureCoords) {
+    public void setupInterleavedDataVBO(final FloatBufferData interleaved, final FloatBufferData vertexCoords,
+            final FloatBufferData normalCoords, final FloatBufferData colorCoords,
+            final List<FloatBufferData> textureCoords) {
         final RenderContext context = ContextManager.getCurrentContext();
         final RendererRecord rendRecord = context.getRendererRecord();
         final ContextCapabilities caps = context.getCapabilities();
 
-        if (vertexCoords.getVBOID(context) <= 0) {
-            initializeInterleavedVBO(context, vertexCoords, normalCoords, colorCoords, textureCoords);
+        if (interleaved.getVBOID(context.getGlContextRep()) <= 0) {
+            initializeInterleavedVBO(context, interleaved, vertexCoords, normalCoords, colorCoords, textureCoords);
         }
 
-        LwjglRendererUtil.setBoundVBO(rendRecord, vertexCoords.getVBOID(context));
+        LwjglRendererUtil.setBoundVBO(rendRecord, interleaved.getVBOID(context.getGlContextRep()));
 
         int offset = 0;
 
@@ -974,20 +960,20 @@ public class LwjglRenderer extends AbstractRenderer {
         LwjglRendererUtil.setBoundVBO(rendRecord, 0);
     }
 
-    private void initializeInterleavedVBO(final RenderContext context, final FloatBufferData vertexCoords,
-            final FloatBufferData normalCoords, final FloatBufferData colorCoords,
+    private void initializeInterleavedVBO(final RenderContext context, final FloatBufferData interleaved,
+            final FloatBufferData vertexCoords, final FloatBufferData normalCoords, final FloatBufferData colorCoords,
             final List<FloatBufferData> textureCoords) {
         final RendererRecord rendRecord = context.getRendererRecord();
         final ContextCapabilities caps = context.getCapabilities();
 
         final int vboID = makeVBOId(rendRecord);
-        vertexCoords.setVBOID(context, vboID);
+        interleaved.setVBOID(context.getGlContextRep(), vboID);
 
         rendRecord.invalidateVBO();
         LwjglRendererUtil.setBoundVBO(rendRecord, vboID);
         final int bufferSize = getTotalInterleavedSize(context, vertexCoords, normalCoords, colorCoords, textureCoords);
         ARBBufferObject.glBufferDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, bufferSize,
-                getGLVBOAccessMode(vertexCoords.getVboAccessMode()));
+                getGLVBOAccessMode(interleaved.getVboAccessMode()));
 
         int offset = 0;
         if (normalCoords != null) {
@@ -1234,55 +1220,6 @@ public class LwjglRenderer extends AbstractRenderer {
                 break;
         }
         return glMode;
-    }
-
-    private int getGLInterleavedFormat(final InterleavedFormat format) {
-        int glInterleavedFormat = GL11.GL_V3F;
-        switch (format) {
-            case GL_V2F:
-                glInterleavedFormat = GL11.GL_V2F;
-                break;
-            case GL_V3F:
-                glInterleavedFormat = GL11.GL_V3F;
-                break;
-            case GL_C3F_V3F:
-                glInterleavedFormat = GL11.GL_C3F_V3F;
-                break;
-            case GL_C4F_N3F_V3F:
-                glInterleavedFormat = GL11.GL_C4F_N3F_V3F;
-                break;
-            case GL_C4UB_V2F:
-                glInterleavedFormat = GL11.GL_C4UB_V2F;
-                break;
-            case GL_C4UB_V3F:
-                glInterleavedFormat = GL11.GL_C4UB_V3F;
-                break;
-            case GL_N3F_V3F:
-                glInterleavedFormat = GL11.GL_N3F_V3F;
-                break;
-            case GL_T2F_C3F_V3F:
-                glInterleavedFormat = GL11.GL_T2F_C3F_V3F;
-                break;
-            case GL_T2F_C4F_N3F_V3F:
-                glInterleavedFormat = GL11.GL_T2F_C4F_N3F_V3F;
-                break;
-            case GL_T2F_C4UB_V3F:
-                glInterleavedFormat = GL11.GL_T2F_C4UB_V3F;
-                break;
-            case GL_T2F_N3F_V3F:
-                glInterleavedFormat = GL11.GL_T2F_N3F_V3F;
-                break;
-            case GL_T2F_V3F:
-                glInterleavedFormat = GL11.GL_T2F_V3F;
-                break;
-            case GL_T4F_C4F_N3F_V4F:
-                glInterleavedFormat = GL11.GL_T4F_C4F_N3F_V4F;
-                break;
-            case GL_T4F_V4F:
-                glInterleavedFormat = GL11.GL_T4F_V4F;
-                break;
-        }
-        return glInterleavedFormat;
     }
 
     public void setModelViewMatrix(final Buffer matrix) {

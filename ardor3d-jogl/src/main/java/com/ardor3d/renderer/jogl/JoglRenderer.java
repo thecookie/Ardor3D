@@ -39,7 +39,6 @@ import com.ardor3d.renderer.ContextCapabilities;
 import com.ardor3d.renderer.ContextManager;
 import com.ardor3d.renderer.DrawBufferTarget;
 import com.ardor3d.renderer.IndexMode;
-import com.ardor3d.renderer.InterleavedFormat;
 import com.ardor3d.renderer.RenderContext;
 import com.ardor3d.renderer.queue.RenderBucketType;
 import com.ardor3d.renderer.queue.RenderQueue;
@@ -107,8 +106,6 @@ public class JoglRenderer extends AbstractRenderer {
     private FloatBuffer _oldColorBuffer;
 
     private FloatBuffer _oldFogBuffer;
-
-    private FloatBuffer _oldInterleavedBuffer;
 
     private final FloatBuffer[] _oldTextureBuffers;
 
@@ -714,20 +711,6 @@ public class JoglRenderer extends AbstractRenderer {
         }
     }
 
-    public void setupInterleavedData(final FloatBuffer interleavedBuffer, final InterleavedFormat format) {
-        final GL gl = GLU.getCurrentGL();
-
-        if (_oldInterleavedBuffer != interleavedBuffer) {
-            interleavedBuffer.rewind();
-
-            final int glFormat = getGLInterleavedFormat(format);
-
-            gl.glInterleavedArrays(glFormat, 0, interleavedBuffer);
-        }
-
-        _oldInterleavedBuffer = interleavedBuffer;
-    }
-
     public void drawElements(final IntBufferData indices, final int[] indexLengths, final IndexMode[] indexModes) {
         if (indices == null || indices.getBuffer() == null) {
             logger.severe("Missing indices for drawElements call without VBO");
@@ -777,7 +760,7 @@ public class JoglRenderer extends AbstractRenderer {
 
         final GL gl = GLU.getCurrentGL();
 
-        int vboID = data.getVBOID(context);
+        int vboID = data.getVBOID(context.getGlContextRep());
         if (vboID > 0) {
             return vboID;
         }
@@ -787,7 +770,7 @@ public class JoglRenderer extends AbstractRenderer {
             // XXX: should we be rewinding? Maybe make that the programmer's responsibility.
             dataBuffer.rewind();
             vboID = makeVBOId(rendRecord);
-            data.setVBOID(context, vboID);
+            data.setVBOID(context.getGlContextRep(), vboID);
 
             rendRecord.invalidateVBO();
             JoglRendererUtil.setBoundVBO(rendRecord, vboID);
@@ -805,7 +788,7 @@ public class JoglRenderer extends AbstractRenderer {
 
         final GL gl = GLU.getCurrentGL();
 
-        int vboID = data.getVBOID(context);
+        int vboID = data.getVBOID(context.getGlContextRep());
         if (vboID > 0) {
             return vboID;
         }
@@ -815,7 +798,7 @@ public class JoglRenderer extends AbstractRenderer {
             // XXX: should we be rewinding? Maybe make that the programmer's responsibility.
             dataBuffer.rewind();
             vboID = makeVBOId(rendRecord);
-            data.setVBOID(context, vboID);
+            data.setVBOID(context.getGlContextRep(), vboID);
 
             rendRecord.invalidateVBO();
             JoglRendererUtil.setBoundVBO(rendRecord, vboID);
@@ -880,8 +863,9 @@ public class JoglRenderer extends AbstractRenderer {
         }
     }
 
-    public void setupInterleavedDataVBO(final FloatBufferData vertexCoords, final FloatBufferData normalCoords,
-            final FloatBufferData colorCoords, final List<FloatBufferData> textureCoords) {
+    public void setupInterleavedDataVBO(final FloatBufferData interleaved, final FloatBufferData vertexCoords,
+            final FloatBufferData normalCoords, final FloatBufferData colorCoords,
+            final List<FloatBufferData> textureCoords) {
     // TODO: adf
     }
 
@@ -1096,55 +1080,6 @@ public class JoglRenderer extends AbstractRenderer {
                 break;
         }
         return glMode;
-    }
-
-    private int getGLInterleavedFormat(final InterleavedFormat format) {
-        int glInterleavedFormat = GL.GL_V3F;
-        switch (format) {
-            case GL_V2F:
-                glInterleavedFormat = GL.GL_V2F;
-                break;
-            case GL_V3F:
-                glInterleavedFormat = GL.GL_V3F;
-                break;
-            case GL_C3F_V3F:
-                glInterleavedFormat = GL.GL_C3F_V3F;
-                break;
-            case GL_C4F_N3F_V3F:
-                glInterleavedFormat = GL.GL_C4F_N3F_V3F;
-                break;
-            case GL_C4UB_V2F:
-                glInterleavedFormat = GL.GL_C4UB_V2F;
-                break;
-            case GL_C4UB_V3F:
-                glInterleavedFormat = GL.GL_C4UB_V3F;
-                break;
-            case GL_N3F_V3F:
-                glInterleavedFormat = GL.GL_N3F_V3F;
-                break;
-            case GL_T2F_C3F_V3F:
-                glInterleavedFormat = GL.GL_T2F_C3F_V3F;
-                break;
-            case GL_T2F_C4F_N3F_V3F:
-                glInterleavedFormat = GL.GL_T2F_C4F_N3F_V3F;
-                break;
-            case GL_T2F_C4UB_V3F:
-                glInterleavedFormat = GL.GL_T2F_C4UB_V3F;
-                break;
-            case GL_T2F_N3F_V3F:
-                glInterleavedFormat = GL.GL_T2F_N3F_V3F;
-                break;
-            case GL_T2F_V3F:
-                glInterleavedFormat = GL.GL_T2F_V3F;
-                break;
-            case GL_T4F_C4F_N3F_V4F:
-                glInterleavedFormat = GL.GL_T4F_C4F_N3F_V4F;
-                break;
-            case GL_T4F_V4F:
-                glInterleavedFormat = GL.GL_T4F_V4F;
-                break;
-        }
-        return glInterleavedFormat;
     }
 
     public void setModelViewMatrix(final Buffer matrix) {
