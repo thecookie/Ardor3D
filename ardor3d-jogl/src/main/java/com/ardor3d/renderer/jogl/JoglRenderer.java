@@ -739,6 +739,8 @@ public class JoglRenderer extends AbstractRenderer {
 
         int vboID = data.getVBOID(context.getGlContextRep());
         if (vboID > 0) {
+            updateVBO(data, rendRecord, vboID, 0);
+
             return vboID;
         }
 
@@ -751,11 +753,24 @@ public class JoglRenderer extends AbstractRenderer {
 
             rendRecord.invalidateVBO();
             JoglRendererUtil.setBoundVBO(rendRecord, vboID);
-            gl.glBufferDataARB(GL.GL_ARRAY_BUFFER_ARB, dataBuffer.limit() * 4, dataBuffer, GL.GL_STATIC_DRAW_ARB);
+            gl.glBufferDataARB(GL.GL_ARRAY_BUFFER_ARB, dataBuffer.limit() * 4, dataBuffer, getGLVBOAccessMode(data
+                    .getVboAccessMode()));
         } else {
             throw new Ardor3dException("Attempting to create a vbo id for a FloatBufferData with no Buffer value.");
         }
         return vboID;
+    }
+
+    private void updateVBO(final FloatBufferData data, final RendererRecord rendRecord, final int vboID,
+            final int offset) {
+        if (data.isNeedsRefresh()) {
+            final GL gl = GLU.getCurrentGL();
+            final FloatBuffer dataBuffer = data.getBuffer();
+            dataBuffer.rewind();
+            JoglRendererUtil.setBoundVBO(rendRecord, vboID);
+            gl.glBufferSubDataARB(GL.GL_ARRAY_BUFFER_ARB, offset, dataBuffer.limit() * 4, dataBuffer);
+            data.setNeedsRefresh(false);
+        }
     }
 
     private int setupVBO(final IntBufferData data, final RenderContext context, final RendererRecord rendRecord) {
@@ -767,6 +782,14 @@ public class JoglRenderer extends AbstractRenderer {
 
         int vboID = data.getVBOID(context.getGlContextRep());
         if (vboID > 0) {
+            if (data.isNeedsRefresh()) {
+                final IntBuffer dataBuffer = data.getBuffer();
+                dataBuffer.rewind();
+                JoglRendererUtil.setBoundVBO(rendRecord, vboID);
+                gl.glBufferSubDataARB(GL.GL_ELEMENT_ARRAY_BUFFER_ARB, 0, dataBuffer.limit() * 4, dataBuffer);
+                data.setNeedsRefresh(false);
+            }
+
             return vboID;
         }
 
@@ -778,8 +801,9 @@ public class JoglRenderer extends AbstractRenderer {
             data.setVBOID(context.getGlContextRep(), vboID);
 
             rendRecord.invalidateVBO();
-            JoglRendererUtil.setBoundVBO(rendRecord, vboID);
-            gl.glBufferDataARB(GL.GL_ARRAY_BUFFER_ARB, dataBuffer.limit() * 4, dataBuffer, GL.GL_STATIC_DRAW_ARB);
+            JoglRendererUtil.setBoundElementVBO(rendRecord, vboID);
+            gl.glBufferDataARB(GL.GL_ELEMENT_ARRAY_BUFFER_ARB, dataBuffer.limit() * 4, dataBuffer,
+                    getGLVBOAccessMode(data.getVboAccessMode()));
         } else {
             throw new Ardor3dException("Attempting to create a vbo id for a FloatBufferData with no Buffer value.");
         }
@@ -925,11 +949,13 @@ public class JoglRenderer extends AbstractRenderer {
             initializeInterleavedVBO(context, interleaved, vertexCoords, normalCoords, colorCoords, textureCoords);
         }
 
-        JoglRendererUtil.setBoundVBO(rendRecord, interleaved.getVBOID(context.getGlContextRep()));
+        final int vboID = interleaved.getVBOID(context.getGlContextRep());
+        JoglRendererUtil.setBoundVBO(rendRecord, vboID);
 
         int offset = 0;
 
         if (normalCoords != null) {
+            updateVBO(normalCoords, rendRecord, vboID, offset);
             gl.glNormalPointer(GL.GL_FLOAT, 0, offset);
             gl.glEnableClientState(GL.GL_NORMAL_ARRAY);
             offset += normalCoords.getBufferLimit() * 4;
@@ -938,6 +964,7 @@ public class JoglRenderer extends AbstractRenderer {
         }
 
         if (colorCoords != null) {
+            updateVBO(colorCoords, rendRecord, vboID, offset);
             gl.glColorPointer(colorCoords.getValuesPerTuple(), GL.GL_FLOAT, 0, offset);
             gl.glEnableClientState(GL.GL_COLOR_ARRAY);
             offset += colorCoords.getBufferLimit() * 4;
@@ -964,6 +991,7 @@ public class JoglRenderer extends AbstractRenderer {
                     final FloatBufferData textureBufferData = textureCoords.get(i + coordinateOffset);
 
                     if (textureBufferData != null) {
+                        updateVBO(textureBufferData, rendRecord, vboID, offset);
                         gl.glTexCoordPointer(textureBufferData.getValuesPerTuple(), GL.GL_FLOAT, 0, offset);
                         gl.glEnableClientState(GL.GL_TEXTURE_COORD_ARRAY);
                         offset += textureBufferData.getBufferLimit() * 4;
@@ -987,6 +1015,7 @@ public class JoglRenderer extends AbstractRenderer {
         }
 
         if (vertexCoords != null) {
+            updateVBO(vertexCoords, rendRecord, vboID, offset);
             gl.glVertexPointer(vertexCoords.getValuesPerTuple(), GL.GL_FLOAT, 0, offset);
             gl.glEnableClientState(GL.GL_VERTEX_ARRAY);
             offset += vertexCoords.getBufferLimit() * 4;

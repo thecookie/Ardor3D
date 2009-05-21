@@ -31,7 +31,7 @@ public abstract class AbstractBufferData<T extends Buffer> {
     protected VBOAccessMode vboAccessMode = VBOAccessMode.StaticDraw;
 
     /** Flag for notifying the renderer that the VBO buffer needs to be updated. */
-    protected boolean needsRefresh = true;
+    protected boolean needsRefresh = false;
 
     /**
      * Gets the count.
