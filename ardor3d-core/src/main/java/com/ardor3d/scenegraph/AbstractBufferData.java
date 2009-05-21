@@ -22,6 +22,13 @@ public abstract class AbstractBufferData<T extends Buffer> {
     /** Buffer holding the data. */
     protected T _buffer;
 
+    /** Access mode of the buffer when using Vertex Buffer Objects */
+    public enum VBOAccessMode {
+        StaticDraw, StaticCopy, StaticRead, StreamDraw, StreamCopy, StreamRead, DynamicDraw, DynamicCopy, DynamicRead
+    }
+
+    protected VBOAccessMode vboAccessMode = VBOAccessMode.StaticDraw;
+
     /**
      * Gets the count.
      * 
@@ -84,5 +91,13 @@ public abstract class AbstractBufferData<T extends Buffer> {
         }
 
         _vboIdCache.put(glContext, vboId);
+    }
+
+    public VBOAccessMode getVboAccessMode() {
+        return vboAccessMode;
+    }
+
+    public void setVboAccessMode(final VBOAccessMode vboAccessMode) {
+        this.vboAccessMode = vboAccessMode;
     }
 }

@@ -88,11 +88,10 @@ import com.ardor3d.scene.state.lwjgl.util.LwjglTextureUtil;
 import com.ardor3d.scenegraph.FloatBufferData;
 import com.ardor3d.scenegraph.IntBufferData;
 import com.ardor3d.scenegraph.Mesh;
-import com.ardor3d.scenegraph.MeshData;
 import com.ardor3d.scenegraph.Renderable;
 import com.ardor3d.scenegraph.Spatial;
+import com.ardor3d.scenegraph.AbstractBufferData.VBOAccessMode;
 import com.ardor3d.scenegraph.hint.NormalsMode;
-import com.ardor3d.scenegraph.hint.SceneHints;
 import com.ardor3d.util.Ardor3dException;
 import com.ardor3d.util.Constants;
 import com.ardor3d.util.geom.BufferUtils;
@@ -106,8 +105,6 @@ import com.ardor3d.util.stat.StatType;
  */
 public class LwjglRenderer extends AbstractRenderer {
     private static final Logger logger = Logger.getLogger(LwjglRenderer.class.getName());
-
-    private boolean _inOrthoMode;
 
     private FloatBuffer _oldVertexBuffer;
 
@@ -315,28 +312,49 @@ public class LwjglRenderer extends AbstractRenderer {
         GL11.glFinish();
     }
 
-    private void applyNormalsMode(final NormalsMode normMode, final ReadOnlyTransform worldTransform) {
-        final RenderContext context = ContextManager.getCurrentContext();
-        final ContextCapabilities caps = context.getCapabilities();
-        switch (normMode) {
-            case NormalizeIfScaled:
-                final ReadOnlyVector3 scale = worldTransform.getScale();
-                if (!(scale.getX() == 1.0 && scale.getY() == 1.0 && scale.getZ() == 1.0)) {
-                    if (scale.getX() == scale.getY() && scale.getY() == scale.getZ() && caps.isOpenGL1_2Supported()
-                            && _prevNormMode != GL12.GL_RESCALE_NORMAL) {
-                        if (_prevNormMode == GL11.GL_NORMALIZE) {
-                            GL11.glDisable(GL11.GL_NORMALIZE);
+    public void applyNormalsMode(final NormalsMode normalsMode, final ReadOnlyTransform worldTransform) {
+        if (normalsMode != NormalsMode.Off) {
+            final RenderContext context = ContextManager.getCurrentContext();
+            final ContextCapabilities caps = context.getCapabilities();
+            switch (normalsMode) {
+                case NormalizeIfScaled:
+                    final ReadOnlyVector3 scale = worldTransform.getScale();
+                    if (!(scale.getX() == 1.0 && scale.getY() == 1.0 && scale.getZ() == 1.0)) {
+                        if (scale.getX() == scale.getY() && scale.getY() == scale.getZ() && caps.isOpenGL1_2Supported()
+                                && _prevNormMode != GL12.GL_RESCALE_NORMAL) {
+                            if (_prevNormMode == GL11.GL_NORMALIZE) {
+                                GL11.glDisable(GL11.GL_NORMALIZE);
+                            }
+                            GL11.glEnable(GL12.GL_RESCALE_NORMAL);
+                            _prevNormMode = GL12.GL_RESCALE_NORMAL;
+                        } else if (_prevNormMode != GL11.GL_NORMALIZE) {
+                            if (_prevNormMode == GL12.GL_RESCALE_NORMAL) {
+                                GL11.glDisable(GL12.GL_RESCALE_NORMAL);
+                            }
+                            GL11.glEnable(GL11.GL_NORMALIZE);
+                            _prevNormMode = GL11.GL_NORMALIZE;
                         }
-                        GL11.glEnable(GL12.GL_RESCALE_NORMAL);
-                        _prevNormMode = GL12.GL_RESCALE_NORMAL;
-                    } else if (_prevNormMode != GL11.GL_NORMALIZE) {
+                    } else {
+                        if (_prevNormMode == GL12.GL_RESCALE_NORMAL) {
+                            GL11.glDisable(GL12.GL_RESCALE_NORMAL);
+                            _prevNormMode = GL11.GL_ZERO;
+                        } else if (_prevNormMode == GL11.GL_NORMALIZE) {
+                            GL11.glDisable(GL11.GL_NORMALIZE);
+                            _prevNormMode = GL11.GL_ZERO;
+                        }
+                    }
+                    break;
+                case AlwaysNormalize:
+                    if (_prevNormMode != GL11.GL_NORMALIZE) {
                         if (_prevNormMode == GL12.GL_RESCALE_NORMAL) {
                             GL11.glDisable(GL12.GL_RESCALE_NORMAL);
                         }
                         GL11.glEnable(GL11.GL_NORMALIZE);
                         _prevNormMode = GL11.GL_NORMALIZE;
                     }
-                } else {
+                    break;
+                case UseProvided:
+                default:
                     if (_prevNormMode == GL12.GL_RESCALE_NORMAL) {
                         GL11.glDisable(GL12.GL_RESCALE_NORMAL);
                         _prevNormMode = GL11.GL_ZERO;
@@ -344,27 +362,25 @@ public class LwjglRenderer extends AbstractRenderer {
                         GL11.glDisable(GL11.GL_NORMALIZE);
                         _prevNormMode = GL11.GL_ZERO;
                     }
-                }
-                break;
-            case AlwaysNormalize:
-                if (_prevNormMode != GL11.GL_NORMALIZE) {
-                    if (_prevNormMode == GL12.GL_RESCALE_NORMAL) {
-                        GL11.glDisable(GL12.GL_RESCALE_NORMAL);
-                    }
-                    GL11.glEnable(GL11.GL_NORMALIZE);
-                    _prevNormMode = GL11.GL_NORMALIZE;
-                }
-                break;
-            case UseProvided:
-            default:
-                if (_prevNormMode == GL12.GL_RESCALE_NORMAL) {
-                    GL11.glDisable(GL12.GL_RESCALE_NORMAL);
-                    _prevNormMode = GL11.GL_ZERO;
-                } else if (_prevNormMode == GL11.GL_NORMALIZE) {
-                    GL11.glDisable(GL11.GL_NORMALIZE);
-                    _prevNormMode = GL11.GL_ZERO;
-                }
-                break;
+                    break;
+            }
+        } else {
+            if (_prevNormMode == GL12.GL_RESCALE_NORMAL) {
+                GL11.glDisable(GL12.GL_RESCALE_NORMAL);
+                _prevNormMode = GL11.GL_ZERO;
+            } else if (_prevNormMode == GL11.GL_NORMALIZE) {
+                GL11.glDisable(GL11.GL_NORMALIZE);
+                _prevNormMode = GL11.GL_ZERO;
+            }
+        }
+    }
+
+    public void applyDefaultColor(final ReadOnlyColorRGBA defaultColor) {
+        if (defaultColor != null) {
+            GL11.glColor4f(defaultColor.getRed(), defaultColor.getGreen(), defaultColor.getBlue(), defaultColor
+                    .getAlpha());
+        } else {
+            GL11.glColor4f(1, 1, 1, 1);
         }
     }
 
@@ -726,7 +742,7 @@ public class LwjglRenderer extends AbstractRenderer {
             rendRecord.invalidateVBO();
             LwjglRendererUtil.setBoundVBO(rendRecord, vboID);
             ARBBufferObject.glBufferDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, dataBuffer,
-                    ARBBufferObject.GL_STATIC_DRAW_ARB);
+                    getGLVBOAccessMode(data.getVboAccessMode()));
         } else {
             throw new Ardor3dException("Attempting to create a vbo id for a FloatBufferData with no Buffer value.");
         }
@@ -753,7 +769,7 @@ public class LwjglRenderer extends AbstractRenderer {
             rendRecord.invalidateVBO();
             LwjglRendererUtil.setBoundVBO(rendRecord, vboID);
             ARBBufferObject.glBufferDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, dataBuffer,
-                    ARBBufferObject.GL_STATIC_DRAW_ARB);
+                    getGLVBOAccessMode(data.getVboAccessMode()));
         } else {
             throw new Ardor3dException("Attempting to create a vbo id for a FloatBufferData with no Buffer value.");
         }
@@ -776,38 +792,23 @@ public class LwjglRenderer extends AbstractRenderer {
         }
     }
 
-    public void setupNormalDataVBO(final FloatBufferData data, final NormalsMode normalMode,
-            final Transform worldTransform) {
+    public void setupNormalDataVBO(final FloatBufferData data) {
         final RenderContext context = ContextManager.getCurrentContext();
         final RendererRecord rendRecord = context.getRendererRecord();
 
         final int vboID = setupVBO(data, context, rendRecord);
 
-        if (normalMode != NormalsMode.Off) {
-            applyNormalsMode(normalMode, worldTransform);
-
-            if (vboID > 0) {
-                GL11.glEnableClientState(GL11.GL_NORMAL_ARRAY);
-                LwjglRendererUtil.setBoundVBO(rendRecord, vboID);
-                GL11.glNormalPointer(GL11.GL_FLOAT, 0, 0);
-            } else {
-                GL11.glDisableClientState(GL11.GL_NORMAL_ARRAY);
-                LwjglRendererUtil.setBoundVBO(rendRecord, 0);
-            }
+        if (vboID > 0) {
+            GL11.glEnableClientState(GL11.GL_NORMAL_ARRAY);
+            LwjglRendererUtil.setBoundVBO(rendRecord, vboID);
+            GL11.glNormalPointer(GL11.GL_FLOAT, 0, 0);
         } else {
-            if (_prevNormMode == GL12.GL_RESCALE_NORMAL) {
-                GL11.glDisable(GL12.GL_RESCALE_NORMAL);
-                _prevNormMode = GL11.GL_ZERO;
-            } else if (_prevNormMode == GL11.GL_NORMALIZE) {
-                GL11.glDisable(GL11.GL_NORMALIZE);
-                _prevNormMode = GL11.GL_ZERO;
-            }
             GL11.glDisableClientState(GL11.GL_NORMAL_ARRAY);
             LwjglRendererUtil.setBoundVBO(rendRecord, 0);
         }
     }
 
-    public void setupColorDataVBO(final FloatBufferData data, final ColorRGBA defaultColor) {
+    public void setupColorDataVBO(final FloatBufferData data) {
         final RenderContext context = ContextManager.getCurrentContext();
         final RendererRecord rendRecord = context.getRendererRecord();
 
@@ -820,13 +821,6 @@ public class LwjglRenderer extends AbstractRenderer {
         } else {
             GL11.glDisableClientState(GL11.GL_COLOR_ARRAY);
             LwjglRendererUtil.setBoundVBO(rendRecord, 0);
-
-            if (defaultColor != null) {
-                GL11.glColor4f(defaultColor.getRed(), defaultColor.getGreen(), defaultColor.getBlue(), defaultColor
-                        .getAlpha());
-            } else {
-                GL11.glColor4f(1, 1, 1, 1);
-            }
         }
     }
 
@@ -898,61 +892,37 @@ public class LwjglRenderer extends AbstractRenderer {
         }
     }
 
-    public void setupInterleavedDataVBO(final FloatBuffer interleavedBuffer, final InterleavedFormat format) {
-    // TODO Auto-generated method stub
-
-    }
-
-    public void setupInterleavedDataVBO(final Mesh mesh) {
+    public void setupInterleavedDataVBO(final FloatBufferData vertexCoords, final FloatBufferData normalCoords,
+            final FloatBufferData colorCoords, final List<FloatBufferData> textureCoords) {
         final RenderContext context = ContextManager.getCurrentContext();
         final RendererRecord rendRecord = context.getRendererRecord();
         final ContextCapabilities caps = context.getCapabilities();
 
-        final MeshData meshData = mesh.getMeshData();
-        final SceneHints sceneHints = mesh.getSceneHints();
-        final ReadOnlyColorRGBA defaultColor = mesh.getDefaultColor();
-
-        if (meshData.getVBOInterleavedID(context) <= 0) {
-            initializeInterleavedVBO(context, rendRecord, caps, meshData);
+        if (vertexCoords.getVBOID(context) <= 0) {
+            initializeInterleavedVBO(context, vertexCoords, normalCoords, colorCoords, textureCoords);
         }
 
-        LwjglRendererUtil.setBoundVBO(rendRecord, meshData.getVBOInterleavedID(context));
+        LwjglRendererUtil.setBoundVBO(rendRecord, vertexCoords.getVBOID(context));
 
         int offset = 0;
 
-        if (meshData.getNormalCoords() != null && sceneHints.getNormalsMode() != NormalsMode.Off) {
-            applyNormalsMode(sceneHints.getNormalsMode(), mesh.getWorldTransform());
-
+        if (normalCoords != null) {
             GL11.glNormalPointer(GL11.GL_FLOAT, 0, offset);
             GL11.glEnableClientState(GL11.GL_NORMAL_ARRAY);
-            offset += meshData.getNormalCoords().getValuesPerTuple() * meshData.getVertexCount() * 4;
+            offset += normalCoords.getBufferLimit() * 4;
         } else {
             GL11.glDisableClientState(GL11.GL_NORMAL_ARRAY);
-            if (_prevNormMode == GL12.GL_RESCALE_NORMAL) {
-                GL11.glDisable(GL12.GL_RESCALE_NORMAL);
-                _prevNormMode = GL11.GL_ZERO;
-            } else if (_prevNormMode == GL11.GL_NORMALIZE) {
-                GL11.glDisable(GL11.GL_NORMALIZE);
-                _prevNormMode = GL11.GL_ZERO;
-            }
         }
 
-        if (meshData.getColorCoords() != null) {
-            GL11.glColorPointer(meshData.getColorCoords().getValuesPerTuple(), GL11.GL_FLOAT, 0, offset);
+        if (colorCoords != null) {
+            GL11.glColorPointer(colorCoords.getValuesPerTuple(), GL11.GL_FLOAT, 0, offset);
             GL11.glEnableClientState(GL11.GL_COLOR_ARRAY);
-            offset += meshData.getColorCoords().getValuesPerTuple() * meshData.getVertexCount() * 4;
+            offset += colorCoords.getBufferLimit() * 4;
         } else {
             GL11.glDisableClientState(GL11.GL_COLOR_ARRAY);
-            if (defaultColor != null) {
-                GL11.glColor4f(defaultColor.getRed(), defaultColor.getGreen(), defaultColor.getBlue(), defaultColor
-                        .getAlpha());
-            } else {
-                GL11.glColor4f(1, 1, 1, 1);
-            }
         }
 
-        if (meshData.getTextureCoords() != null) {
-            final List<FloatBufferData> textureCoords = meshData.getTextureCoords();
+        if (textureCoords != null) {
             final TextureState ts = (TextureState) context.getCurrentState(RenderState.StateType.Texture);
             int coordinateOffset = 0;
             if (ts != null) {
@@ -973,7 +943,7 @@ public class LwjglRenderer extends AbstractRenderer {
                     if (textureBufferData != null) {
                         GL11.glTexCoordPointer(textureBufferData.getValuesPerTuple(), GL11.GL_FLOAT, 0, offset);
                         GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
-                        offset += textureBufferData.getValuesPerTuple() * meshData.getVertexCount() * 4;
+                        offset += textureBufferData.getBufferLimit() * 4;
                     } else {
                         GL11.glDisableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
                     }
@@ -993,10 +963,10 @@ public class LwjglRenderer extends AbstractRenderer {
             }
         }
 
-        if (meshData.getVertexCoords() != null) {
-            GL11.glVertexPointer(meshData.getVertexCoords().getValuesPerTuple(), GL11.GL_FLOAT, 0, offset);
+        if (vertexCoords != null) {
+            GL11.glVertexPointer(vertexCoords.getValuesPerTuple(), GL11.GL_FLOAT, 0, offset);
             GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
-            offset += meshData.getVertexCoords().getValuesPerTuple() * meshData.getVertexCount() * 4;
+            offset += vertexCoords.getBufferLimit() * 4;
         } else {
             GL11.glDisableClientState(GL11.GL_VERTEX_ARRAY);
         }
@@ -1004,34 +974,35 @@ public class LwjglRenderer extends AbstractRenderer {
         LwjglRendererUtil.setBoundVBO(rendRecord, 0);
     }
 
-    private void initializeInterleavedVBO(final RenderContext context, final RendererRecord rendRecord,
-            final ContextCapabilities caps, final MeshData meshData) {
+    private void initializeInterleavedVBO(final RenderContext context, final FloatBufferData vertexCoords,
+            final FloatBufferData normalCoords, final FloatBufferData colorCoords,
+            final List<FloatBufferData> textureCoords) {
+        final RendererRecord rendRecord = context.getRendererRecord();
+        final ContextCapabilities caps = context.getCapabilities();
+
         final int vboID = makeVBOId(rendRecord);
-        meshData.setVBOInterleavedID(context, vboID);
+        vertexCoords.setVBOID(context, vboID);
 
         rendRecord.invalidateVBO();
         LwjglRendererUtil.setBoundVBO(rendRecord, vboID);
-
-        final int bufferSize = getTotalInterleavedSize(meshData);
-
+        final int bufferSize = getTotalInterleavedSize(context, vertexCoords, normalCoords, colorCoords, textureCoords);
         ARBBufferObject.glBufferDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, bufferSize,
-                ARBBufferObject.GL_STATIC_DRAW_ARB);
+                getGLVBOAccessMode(vertexCoords.getVboAccessMode()));
 
         int offset = 0;
-        if (meshData.getNormalCoords() != null) {
-            meshData.getNormalCoords().getBuffer().rewind();
-            ARBBufferObject.glBufferSubDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, offset, meshData
-                    .getNormalCoords().getBuffer());
-            offset += meshData.getNormalCoords().getValuesPerTuple() * meshData.getVertexCount() * 4;
+        if (normalCoords != null) {
+            normalCoords.getBuffer().rewind();
+            ARBBufferObject.glBufferSubDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, offset, normalCoords
+                    .getBuffer());
+            offset += normalCoords.getBufferLimit() * 4;
         }
-        if (meshData.getColorCoords() != null) {
-            meshData.getColorCoords().getBuffer().rewind();
-            ARBBufferObject.glBufferSubDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, offset, meshData
-                    .getColorCoords().getBuffer());
-            offset += meshData.getColorCoords().getValuesPerTuple() * meshData.getVertexCount() * 4;
+        if (colorCoords != null) {
+            colorCoords.getBuffer().rewind();
+            ARBBufferObject.glBufferSubDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, offset, colorCoords
+                    .getBuffer());
+            offset += colorCoords.getBufferLimit() * 4;
         }
-        if (meshData.getTextureCoords() != null) {
-            final List<FloatBufferData> textureCoords = meshData.getTextureCoords();
+        if (textureCoords != null) {
             final TextureState ts = (TextureState) context.getCurrentState(RenderState.StateType.Texture);
             int coordinateOffset = 0;
             if (ts != null) {
@@ -1048,32 +1019,32 @@ public class LwjglRenderer extends AbstractRenderer {
                         textureBuffer.rewind();
                         ARBBufferObject.glBufferSubDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, offset,
                                 textureBuffer);
-                        offset += textureBufferData.getValuesPerTuple() * meshData.getVertexCount() * 4;
+                        offset += textureBufferData.getBufferLimit() * 4;
                     }
                 }
             }
         }
-        if (meshData.getVertexCoords() != null) {
-            meshData.getVertexCoords().getBuffer().rewind();
-            ARBBufferObject.glBufferSubDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, offset, meshData
-                    .getVertexCoords().getBuffer());
-            offset += meshData.getVertexCoords().getValuesPerTuple() * meshData.getVertexCount() * 4;
+        if (vertexCoords != null) {
+            vertexCoords.getBuffer().rewind();
+            ARBBufferObject.glBufferSubDataARB(ARBVertexBufferObject.GL_ARRAY_BUFFER_ARB, offset, vertexCoords
+                    .getBuffer());
+            offset += vertexCoords.getBufferLimit() * 4;
         }
     }
 
-    private int getTotalInterleavedSize(final MeshData meshData) {
-        final RenderContext context = ContextManager.getCurrentContext();
+    private int getTotalInterleavedSize(final RenderContext context, final FloatBufferData vertexCoords,
+            final FloatBufferData normalCoords, final FloatBufferData colorCoords,
+            final List<FloatBufferData> textureCoords) {
         final ContextCapabilities caps = context.getCapabilities();
 
         int bufferSize = 0;
-        if (meshData.getNormalCoords() != null) {
-            bufferSize += meshData.getNormalCoords().getValuesPerTuple();
+        if (normalCoords != null) {
+            bufferSize += normalCoords.getBufferLimit() * 4;
         }
-        if (meshData.getColorCoords() != null) {
-            bufferSize += meshData.getColorCoords().getValuesPerTuple();
+        if (colorCoords != null) {
+            bufferSize += colorCoords.getBufferLimit() * 4;
         }
-        if (meshData.getTextureCoords() != null) {
-            final List<FloatBufferData> textureCoords = meshData.getTextureCoords();
+        if (textureCoords != null) {
             final TextureState ts = (TextureState) context.getCurrentState(RenderState.StateType.Texture);
             int offset = 0;
             if (ts != null) {
@@ -1086,15 +1057,14 @@ public class LwjglRenderer extends AbstractRenderer {
 
                     final FloatBufferData textureBufferData = textureCoords.get(i + offset);
                     if (textureBufferData != null) {
-                        bufferSize += textureBufferData.getValuesPerTuple();
+                        bufferSize += textureBufferData.getBufferLimit() * 4;
                     }
                 }
             }
         }
-        if (meshData.getVertexCoords() != null) {
-            bufferSize += meshData.getVertexCoords().getValuesPerTuple();
+        if (vertexCoords != null) {
+            bufferSize += vertexCoords.getBufferLimit() * 4;
         }
-        bufferSize *= meshData.getVertexCount() * 4;
 
         return bufferSize;
     }
@@ -1196,6 +1166,40 @@ public class LwjglRenderer extends AbstractRenderer {
         final RendererRecord rendRecord = context.getRendererRecord();
         LwjglRendererUtil.setBoundVBO(rendRecord, 0);
         LwjglRendererUtil.setBoundElementVBO(rendRecord, 0);
+    }
+
+    private int getGLVBOAccessMode(final VBOAccessMode vboAccessMode) {
+        int glMode = GL11.GL_TRIANGLES;
+        switch (vboAccessMode) {
+            case StaticDraw:
+                glMode = ARBBufferObject.GL_STATIC_DRAW_ARB;
+                break;
+            case StaticRead:
+                glMode = ARBBufferObject.GL_STATIC_READ_ARB;
+                break;
+            case StaticCopy:
+                glMode = ARBBufferObject.GL_STATIC_COPY_ARB;
+                break;
+            case DynamicDraw:
+                glMode = ARBBufferObject.GL_DYNAMIC_DRAW_ARB;
+                break;
+            case DynamicRead:
+                glMode = ARBBufferObject.GL_DYNAMIC_READ_ARB;
+                break;
+            case DynamicCopy:
+                glMode = ARBBufferObject.GL_DYNAMIC_COPY_ARB;
+                break;
+            case StreamDraw:
+                glMode = ARBBufferObject.GL_STREAM_DRAW_ARB;
+                break;
+            case StreamRead:
+                glMode = ARBBufferObject.GL_STREAM_READ_ARB;
+                break;
+            case StreamCopy:
+                glMode = ARBBufferObject.GL_STREAM_COPY_ARB;
+                break;
+        }
+        return glMode;
     }
 
     private int getGLIndexMode(final IndexMode indexMode) {

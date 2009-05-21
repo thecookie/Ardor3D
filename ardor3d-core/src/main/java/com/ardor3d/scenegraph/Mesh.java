@@ -227,16 +227,34 @@ public class Mesh extends Spatial implements Renderable {
         if ((getSceneHints().getDataMode() == DataMode.VBO || getSceneHints().getDataMode() == DataMode.VBOInterleaved)
                 && caps.isVBOSupported()) {
             if (getSceneHints().getDataMode() == DataMode.VBOInterleaved) {
-                renderer.setupInterleavedDataVBO(this);
+                if (_meshData.getColorCoords() == null) {
+                    renderer.applyDefaultColor(_defaultColor);
+                }
+                renderer.applyNormalsMode(getSceneHints().getNormalsMode(), _worldTransform);
+                renderer.setupInterleavedDataVBO(_meshData.getVertexCoords(), _meshData.getNormalCoords(), _meshData
+                        .getColorCoords(), _meshData.getTextureCoords());
             } else {
                 if (RENDER_VERTEX_ONLY) {
-                    renderer.setupNormalDataVBO(null, NormalsMode.Off, null);
-                    renderer.setupColorDataVBO(null, null);
+                    renderer.applyNormalsMode(NormalsMode.Off, null);
+                    renderer.setupNormalDataVBO(null);
+                    renderer.applyDefaultColor(null);
+                    renderer.setupColorDataVBO(null);
                     renderer.setupTextureDataVBO(null);
                 } else {
-                    renderer.setupNormalDataVBO(_meshData.getNormalCoords(), getSceneHints().getNormalsMode(),
-                            _worldTransform);
-                    renderer.setupColorDataVBO(_meshData.getColorCoords(), _defaultColor);
+                    renderer.applyNormalsMode(getSceneHints().getNormalsMode(), _worldTransform);
+                    if (getSceneHints().getNormalsMode() != NormalsMode.Off) {
+                        renderer.setupNormalDataVBO(_meshData.getNormalCoords());
+                    } else {
+                        renderer.setupNormalDataVBO(null);
+                    }
+
+                    if (_meshData.getColorCoords() != null) {
+                        renderer.setupColorDataVBO(_meshData.getColorCoords());
+                    } else {
+                        renderer.applyDefaultColor(_defaultColor);
+                        renderer.setupColorDataVBO(null);
+                    }
+
                     renderer.setupTextureDataVBO(_meshData.getTextureCoords());
                 }
                 renderer.setupVertexDataVBO(_meshData.getVertexCoords());

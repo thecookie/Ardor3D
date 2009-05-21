@@ -332,30 +332,50 @@ public class JoglRenderer extends AbstractRenderer {
         gl.glFinish();
     }
 
-    private void applyNormalMode(final NormalsMode normMode, final Transform worldTransform) {
+    public void applyNormalsMode(final NormalsMode normalsMode, final ReadOnlyTransform worldTransform) {
         final GL gl = GLU.getCurrentGL();
-        final RenderContext context = ContextManager.getCurrentContext();
-        final ContextCapabilities caps = context.getCapabilities();
-
-        switch (normMode) {
-            case NormalizeIfScaled:
-                final ReadOnlyVector3 scale = worldTransform.getScale();
-                if (!(scale.getX() == 1.0 && scale.getY() == 1.0 && scale.getZ() == 1.0)) {
-                    if (scale.getX() == scale.getY() && scale.getY() == scale.getZ() && caps.isOpenGL1_2Supported()
-                            && _prevNormMode != GL.GL_RESCALE_NORMAL) {
-                        if (_prevNormMode == GL.GL_NORMALIZE) {
-                            gl.glDisable(GL.GL_NORMALIZE);
+        if (normalsMode != NormalsMode.Off) {
+            final RenderContext context = ContextManager.getCurrentContext();
+            final ContextCapabilities caps = context.getCapabilities();
+            switch (normalsMode) {
+                case NormalizeIfScaled:
+                    final ReadOnlyVector3 scale = worldTransform.getScale();
+                    if (!(scale.getX() == 1.0 && scale.getY() == 1.0 && scale.getZ() == 1.0)) {
+                        if (scale.getX() == scale.getY() && scale.getY() == scale.getZ() && caps.isOpenGL1_2Supported()
+                                && _prevNormMode != GL.GL_RESCALE_NORMAL) {
+                            if (_prevNormMode == GL.GL_NORMALIZE) {
+                                gl.glDisable(GL.GL_NORMALIZE);
+                            }
+                            gl.glEnable(GL.GL_RESCALE_NORMAL);
+                            _prevNormMode = GL.GL_RESCALE_NORMAL;
+                        } else if (_prevNormMode != GL.GL_NORMALIZE) {
+                            if (_prevNormMode == GL.GL_RESCALE_NORMAL) {
+                                gl.glDisable(GL.GL_RESCALE_NORMAL);
+                            }
+                            gl.glEnable(GL.GL_NORMALIZE);
+                            _prevNormMode = GL.GL_NORMALIZE;
                         }
-                        gl.glEnable(GL.GL_RESCALE_NORMAL);
-                        _prevNormMode = GL.GL_RESCALE_NORMAL;
-                    } else if (_prevNormMode != GL.GL_NORMALIZE) {
+                    } else {
+                        if (_prevNormMode == GL.GL_RESCALE_NORMAL) {
+                            gl.glDisable(GL.GL_RESCALE_NORMAL);
+                            _prevNormMode = GL.GL_ZERO;
+                        } else if (_prevNormMode == GL.GL_NORMALIZE) {
+                            gl.glDisable(GL.GL_NORMALIZE);
+                            _prevNormMode = GL.GL_ZERO;
+                        }
+                    }
+                    break;
+                case AlwaysNormalize:
+                    if (_prevNormMode != GL.GL_NORMALIZE) {
                         if (_prevNormMode == GL.GL_RESCALE_NORMAL) {
                             gl.glDisable(GL.GL_RESCALE_NORMAL);
                         }
                         gl.glEnable(GL.GL_NORMALIZE);
                         _prevNormMode = GL.GL_NORMALIZE;
                     }
-                } else {
+                    break;
+                case UseProvided:
+                default:
                     if (_prevNormMode == GL.GL_RESCALE_NORMAL) {
                         gl.glDisable(GL.GL_RESCALE_NORMAL);
                         _prevNormMode = GL.GL_ZERO;
@@ -363,27 +383,26 @@ public class JoglRenderer extends AbstractRenderer {
                         gl.glDisable(GL.GL_NORMALIZE);
                         _prevNormMode = GL.GL_ZERO;
                     }
-                }
-                break;
-            case AlwaysNormalize:
-                if (_prevNormMode != GL.GL_NORMALIZE) {
-                    if (_prevNormMode == GL.GL_RESCALE_NORMAL) {
-                        gl.glDisable(GL.GL_RESCALE_NORMAL);
-                    }
-                    gl.glEnable(GL.GL_NORMALIZE);
-                    _prevNormMode = GL.GL_NORMALIZE;
-                }
-                break;
-            case UseProvided:
-            default:
-                if (_prevNormMode == GL.GL_RESCALE_NORMAL) {
-                    gl.glDisable(GL.GL_RESCALE_NORMAL);
-                    _prevNormMode = GL.GL_ZERO;
-                } else if (_prevNormMode == GL.GL_NORMALIZE) {
-                    gl.glDisable(GL.GL_NORMALIZE);
-                    _prevNormMode = GL.GL_ZERO;
-                }
-                break;
+                    break;
+            }
+        } else {
+            if (_prevNormMode == GL.GL_RESCALE_NORMAL) {
+                gl.glDisable(GL.GL_RESCALE_NORMAL);
+                _prevNormMode = GL.GL_ZERO;
+            } else if (_prevNormMode == GL.GL_NORMALIZE) {
+                gl.glDisable(GL.GL_NORMALIZE);
+                _prevNormMode = GL.GL_ZERO;
+            }
+        }
+    }
+
+    public void applyDefaultColor(final ReadOnlyColorRGBA defaultColor) {
+        final GL gl = GLU.getCurrentGL();
+        if (defaultColor != null) {
+            gl.glColor4f(defaultColor.getRed(), defaultColor.getGreen(), defaultColor.getBlue(), defaultColor
+                    .getAlpha());
+        } else {
+            gl.glColor4f(1, 1, 1, 1);
         }
     }
 
@@ -579,7 +598,7 @@ public class JoglRenderer extends AbstractRenderer {
         final FloatBuffer normalBuffer = normalBufferData != null ? normalBufferData.getBuffer() : null;
 
         if (normalMode != NormalsMode.Off) {
-            applyNormalMode(normalMode, worldTransform);
+            applyNormalsMode(normalMode, worldTransform);
 
             if (normalBuffer == null) {
                 gl.glDisableClientState(GL.GL_NORMAL_ARRAY);
@@ -825,8 +844,7 @@ public class JoglRenderer extends AbstractRenderer {
         }
     }
 
-    public void setupNormalDataVBO(final FloatBufferData data, final NormalsMode normalMode,
-            final Transform worldTransform) {
+    public void setupNormalDataVBO(final FloatBufferData data) {
         final GL gl = GLU.getCurrentGL();
 
         final RenderContext context = ContextManager.getCurrentContext();
@@ -834,31 +852,17 @@ public class JoglRenderer extends AbstractRenderer {
 
         final int vboID = setupVBO(data, context, rendRecord);
 
-        if (normalMode != NormalsMode.Off) {
-            applyNormalMode(normalMode, worldTransform);
-
-            if (vboID > 0) {
-                gl.glEnableClientState(GL.GL_NORMAL_ARRAY);
-                JoglRendererUtil.setBoundVBO(rendRecord, vboID);
-                gl.glNormalPointer(GL.GL_FLOAT, 0, 0);
-            } else {
-                gl.glDisableClientState(GL.GL_NORMAL_ARRAY);
-                JoglRendererUtil.setBoundVBO(rendRecord, 0);
-            }
+        if (vboID > 0) {
+            gl.glEnableClientState(GL.GL_NORMAL_ARRAY);
+            JoglRendererUtil.setBoundVBO(rendRecord, vboID);
+            gl.glNormalPointer(GL.GL_FLOAT, 0, 0);
         } else {
-            if (_prevNormMode == GL.GL_RESCALE_NORMAL) {
-                gl.glDisable(GL.GL_RESCALE_NORMAL);
-                _prevNormMode = GL.GL_ZERO;
-            } else if (_prevNormMode == GL.GL_NORMALIZE) {
-                gl.glDisable(GL.GL_NORMALIZE);
-                _prevNormMode = GL.GL_ZERO;
-            }
             gl.glDisableClientState(GL.GL_NORMAL_ARRAY);
             JoglRendererUtil.setBoundVBO(rendRecord, 0);
         }
     }
 
-    public void setupColorDataVBO(final FloatBufferData data, final ColorRGBA defaultColor) {
+    public void setupColorDataVBO(final FloatBufferData data) {
         final GL gl = GLU.getCurrentGL();
 
         final RenderContext context = ContextManager.getCurrentContext();
@@ -873,31 +877,12 @@ public class JoglRenderer extends AbstractRenderer {
         } else {
             gl.glDisableClientState(GL.GL_COLOR_ARRAY);
             JoglRendererUtil.setBoundVBO(rendRecord, 0);
-
-            if (defaultColor != null) {
-                gl.glColor4f(defaultColor.getRed(), defaultColor.getGreen(), defaultColor.getBlue(), defaultColor
-                        .getAlpha());
-            } else {
-                gl.glColor4f(1, 1, 1, 1);
-            }
         }
     }
 
-    public void setupInterleavedDataVBO(final FloatBuffer interleavedBuffer, final InterleavedFormat format) {
-        final GL gl = GLU.getCurrentGL();
-
-        if (_oldInterleavedBuffer != interleavedBuffer) {
-            interleavedBuffer.rewind();
-
-            final int glFormat = getGLInterleavedFormat(format);
-
-            gl.glInterleavedArrays(glFormat, 0, interleavedBuffer);
-        }
-        _oldInterleavedBuffer = interleavedBuffer;
-    }
-
-    public void setupInterleavedDataVBO(final Mesh mesh) {
-    // TODO Auto-generated method stub
+    public void setupInterleavedDataVBO(final FloatBufferData vertexCoords, final FloatBufferData normalCoords,
+            final FloatBufferData colorCoords, final List<FloatBufferData> textureCoords) {
+    // TODO: adf
     }
 
     public void setupFogDataVBO(final FloatBufferData data) {

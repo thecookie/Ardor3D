@@ -27,7 +27,9 @@ import com.ardor3d.input.logical.TriggerAction;
 import com.ardor3d.math.Vector3;
 import com.ardor3d.renderer.queue.RenderBucketType;
 import com.ardor3d.renderer.state.CullState;
+import com.ardor3d.renderer.state.MaterialState;
 import com.ardor3d.renderer.state.TextureState;
+import com.ardor3d.renderer.state.MaterialState.ColorMaterial;
 import com.ardor3d.scenegraph.Mesh;
 import com.ardor3d.scenegraph.Spatial;
 import com.ardor3d.scenegraph.hint.DataMode;
@@ -81,6 +83,10 @@ public class VBOSpeedExample extends ExampleBase {
         cs.setEnabled(true);
         _root.setRenderState(cs);
 
+        final MaterialState ms = new MaterialState();
+        ms.setColorMaterial(ColorMaterial.Diffuse);
+        _root.setRenderState(ms);
+
         final TextureState ts = new TextureState();
         ts.setEnabled(true);
         ts.setTexture(TextureManager.load("images/ardor3d_white_256.jpg", Texture.MinificationFilter.Trilinear,
@@ -89,6 +95,7 @@ public class VBOSpeedExample extends ExampleBase {
         final Random rand = new Random(1337);
         for (int i = 0; i < 100; i++) {
             final Sphere sphere = new Sphere("Sphere", 32, 32, 2);
+            sphere.setRandomColors();
             sphere.setModelBound(new BoundingBox());
             sphere.setRenderState(ts);
             sphere.setTranslation(new Vector3(rand.nextDouble() * 100.0 - 50.0, rand.nextDouble() * 100.0 - 50.0, rand

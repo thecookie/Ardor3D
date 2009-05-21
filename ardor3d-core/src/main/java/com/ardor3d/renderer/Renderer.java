@@ -27,7 +27,6 @@ import com.ardor3d.renderer.state.RenderState;
 import com.ardor3d.renderer.state.RenderState.StateType;
 import com.ardor3d.scenegraph.FloatBufferData;
 import com.ardor3d.scenegraph.IntBufferData;
-import com.ardor3d.scenegraph.Mesh;
 import com.ardor3d.scenegraph.Renderable;
 import com.ardor3d.scenegraph.Spatial;
 import com.ardor3d.scenegraph.hint.NormalsMode;
@@ -297,21 +296,23 @@ public interface Renderer {
 
     void drawArrays(final FloatBufferData vertexBuffer, final int[] indexLengths, final IndexMode[] indexModes);
 
+    void applyNormalsMode(final NormalsMode normMode, final ReadOnlyTransform worldTransform);
+
+    void applyDefaultColor(final ReadOnlyColorRGBA defaultColor);
+
     // TODO: VBO
     void setupVertexDataVBO(final FloatBufferData vertexCoords);
 
-    void setupNormalDataVBO(final FloatBufferData normalCoords, final NormalsMode normalMode,
-            final Transform worldTransform);
+    void setupNormalDataVBO(final FloatBufferData normalCoords);
 
-    void setupColorDataVBO(final FloatBufferData colorCoords, final ColorRGBA defaultColor);
+    void setupColorDataVBO(final FloatBufferData colorCoords);
 
     void setupFogDataVBO(final FloatBufferData fogCoords);
 
     void setupTextureDataVBO(final List<FloatBufferData> textureCoords);
 
-    void setupInterleavedDataVBO(final FloatBuffer interleavedBuffer, InterleavedFormat format);
-
-    void setupInterleavedDataVBO(final Mesh mesh);
+    void setupInterleavedDataVBO(final FloatBufferData vertexCoords, final FloatBufferData normalCoords,
+            final FloatBufferData colorCoords, final List<FloatBufferData> textureCoords);
 
     void drawElementsVBO(final IntBufferData indices, final int[] indexLengths, final IndexMode[] indexModes);
 
