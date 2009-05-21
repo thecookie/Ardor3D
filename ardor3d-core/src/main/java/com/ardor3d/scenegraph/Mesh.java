@@ -285,13 +285,26 @@ public class Mesh extends Spatial implements Renderable {
             }
 
             if (RENDER_VERTEX_ONLY) {
-                renderer.setupNormalData(null, NormalsMode.Off, null);
-                renderer.setupColorData(null, null);
+                renderer.applyNormalsMode(NormalsMode.Off, null);
+                renderer.setupNormalData(null);
+                renderer.applyDefaultColor(null);
+                renderer.setupColorData(null);
                 renderer.setupTextureData(null);
             } else {
-                renderer
-                        .setupNormalData(_meshData.getNormalCoords(), getSceneHints().getNormalsMode(), _worldTransform);
-                renderer.setupColorData(_meshData.getColorCoords(), _defaultColor);
+                renderer.applyNormalsMode(getSceneHints().getNormalsMode(), _worldTransform);
+                if (getSceneHints().getNormalsMode() != NormalsMode.Off) {
+                    renderer.setupNormalData(_meshData.getNormalCoords());
+                } else {
+                    renderer.setupNormalData(null);
+                }
+
+                if (_meshData.getColorCoords() != null) {
+                    renderer.setupColorData(_meshData.getColorCoords());
+                } else {
+                    renderer.applyDefaultColor(_defaultColor);
+                    renderer.setupColorData(null);
+                }
+
                 renderer.setupTextureData(_meshData.getTextureCoords());
             }
             renderer.setupVertexData(_meshData.getVertexCoords());

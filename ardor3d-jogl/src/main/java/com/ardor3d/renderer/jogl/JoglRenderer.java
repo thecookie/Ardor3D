@@ -27,7 +27,6 @@ import javax.media.opengl.glu.GLU;
 import com.ardor3d.image.Image;
 import com.ardor3d.image.Texture;
 import com.ardor3d.image.Image.Format;
-import com.ardor3d.math.ColorRGBA;
 import com.ardor3d.math.Matrix4;
 import com.ardor3d.math.Transform;
 import com.ardor3d.math.type.ReadOnlyColorRGBA;
@@ -589,52 +588,29 @@ public class JoglRenderer extends AbstractRenderer {
         _oldVertexBuffer = vertexBuffer;
     }
 
-    public void setupNormalData(final FloatBufferData normalBufferData, final NormalsMode normalMode,
-            final Transform worldTransform) {
+    public void setupNormalData(final FloatBufferData normalBufferData) {
         final GL gl = GLU.getCurrentGL();
 
         final FloatBuffer normalBuffer = normalBufferData != null ? normalBufferData.getBuffer() : null;
 
-        if (normalMode != NormalsMode.Off) {
-            applyNormalsMode(normalMode, worldTransform);
-
-            if (normalBuffer == null) {
-                gl.glDisableClientState(GL.GL_NORMAL_ARRAY);
-            } else if (_oldNormalBuffer != normalBuffer) {
-                gl.glEnableClientState(GL.GL_NORMAL_ARRAY);
-                normalBuffer.rewind();
-                gl.glNormalPointer(GL.GL_FLOAT, 0, normalBuffer);
-            }
-
-            _oldNormalBuffer = normalBuffer;
-        } else {
-            if (_prevNormMode == GL.GL_RESCALE_NORMAL) {
-                gl.glDisable(GL.GL_RESCALE_NORMAL);
-                _prevNormMode = GL.GL_ZERO;
-            } else if (_prevNormMode == GL.GL_NORMALIZE) {
-                gl.glDisable(GL.GL_NORMALIZE);
-                _prevNormMode = GL.GL_ZERO;
-            }
+        if (normalBuffer == null) {
             gl.glDisableClientState(GL.GL_NORMAL_ARRAY);
-
-            _oldNormalBuffer = null;
+        } else if (_oldNormalBuffer != normalBuffer) {
+            gl.glEnableClientState(GL.GL_NORMAL_ARRAY);
+            normalBuffer.rewind();
+            gl.glNormalPointer(GL.GL_FLOAT, 0, normalBuffer);
         }
+
+        _oldNormalBuffer = normalBuffer;
     }
 
-    public void setupColorData(final FloatBufferData colorBufferData, final ColorRGBA defaultColor) {
+    public void setupColorData(final FloatBufferData colorBufferData) {
         final GL gl = GLU.getCurrentGL();
 
         final FloatBuffer colorBuffer = colorBufferData != null ? colorBufferData.getBuffer() : null;
 
         if (colorBuffer == null) {
             gl.glDisableClientState(GL.GL_COLOR_ARRAY);
-
-            if (defaultColor != null) {
-                gl.glColor4f(defaultColor.getRed(), defaultColor.getGreen(), defaultColor.getBlue(), defaultColor
-                        .getAlpha());
-            } else {
-                gl.glColor4f(1, 1, 1, 1);
-            }
         } else if (_oldColorBuffer != colorBuffer) {
             gl.glEnableClientState(GL.GL_COLOR_ARRAY);
             colorBuffer.rewind();

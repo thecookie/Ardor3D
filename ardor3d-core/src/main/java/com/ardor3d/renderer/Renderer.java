@@ -17,7 +17,6 @@ import java.util.List;
 import com.ardor3d.image.Image;
 import com.ardor3d.image.Texture;
 import com.ardor3d.image.Image.Format;
-import com.ardor3d.math.ColorRGBA;
 import com.ardor3d.math.Transform;
 import com.ardor3d.math.type.ReadOnlyColorRGBA;
 import com.ardor3d.math.type.ReadOnlyTransform;
@@ -280,10 +279,9 @@ public interface Renderer {
     // TODO: Arrays
     void setupVertexData(final FloatBufferData vertexCoords);
 
-    void setupNormalData(final FloatBufferData normalCoords, final NormalsMode normalMode,
-            final Transform worldTransform);
+    void setupNormalData(final FloatBufferData normalCoords);
 
-    void setupColorData(final FloatBufferData colorCoords, final ColorRGBA defaultColor);
+    void setupColorData(final FloatBufferData colorCoords);
 
     void setupFogData(final FloatBufferData fogCoords);
 
