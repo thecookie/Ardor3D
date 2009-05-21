@@ -1018,43 +1018,6 @@ public class LwjglRenderer extends AbstractRenderer {
         }
     }
 
-    private int getTotalInterleavedSize(final RenderContext context, final FloatBufferData vertexCoords,
-            final FloatBufferData normalCoords, final FloatBufferData colorCoords,
-            final List<FloatBufferData> textureCoords) {
-        final ContextCapabilities caps = context.getCapabilities();
-
-        int bufferSize = 0;
-        if (normalCoords != null) {
-            bufferSize += normalCoords.getBufferLimit() * 4;
-        }
-        if (colorCoords != null) {
-            bufferSize += colorCoords.getBufferLimit() * 4;
-        }
-        if (textureCoords != null) {
-            final TextureState ts = (TextureState) context.getCurrentState(RenderState.StateType.Texture);
-            int offset = 0;
-            if (ts != null) {
-                offset = ts.getTextureCoordinateOffset();
-
-                for (int i = 0; i < ts.getNumberOfSetTextures() && i < caps.getNumberOfFragmentTexCoordUnits(); i++) {
-                    if (textureCoords == null || i >= textureCoords.size()) {
-                        continue;
-                    }
-
-                    final FloatBufferData textureBufferData = textureCoords.get(i + offset);
-                    if (textureBufferData != null) {
-                        bufferSize += textureBufferData.getBufferLimit() * 4;
-                    }
-                }
-            }
-        }
-        if (vertexCoords != null) {
-            bufferSize += vertexCoords.getBufferLimit() * 4;
-        }
-
-        return bufferSize;
-    }
-
     public void drawElementsVBO(final IntBufferData indices, final int[] indexLengths, final IndexMode[] indexModes) {
         final RenderContext context = ContextManager.getCurrentContext();
         final RendererRecord rendRecord = context.getRendererRecord();

@@ -11,12 +11,15 @@
 package com.ardor3d.renderer;
 
 import java.util.EnumMap;
+import java.util.List;
 
 import com.ardor3d.math.ColorRGBA;
 import com.ardor3d.math.type.ReadOnlyColorRGBA;
 import com.ardor3d.renderer.queue.RenderQueue;
 import com.ardor3d.renderer.state.RenderState;
+import com.ardor3d.renderer.state.TextureState;
 import com.ardor3d.renderer.state.RenderState.StateType;
+import com.ardor3d.scenegraph.FloatBufferData;
 import com.ardor3d.util.Constants;
 import com.ardor3d.util.stat.StatCollector;
 import com.ardor3d.util.stat.StatType;
@@ -116,5 +119,42 @@ public abstract class AbstractRenderer implements Renderer {
                 StatCollector.addStat(StatType.STAT_QUAD_COUNT, primCount);
                 break;
         }
+    }
+
+    protected int getTotalInterleavedSize(final RenderContext context, final FloatBufferData vertexCoords,
+            final FloatBufferData normalCoords, final FloatBufferData colorCoords,
+            final List<FloatBufferData> textureCoords) {
+        final ContextCapabilities caps = context.getCapabilities();
+
+        int bufferSize = 0;
+        if (normalCoords != null) {
+            bufferSize += normalCoords.getBufferLimit() * 4;
+        }
+        if (colorCoords != null) {
+            bufferSize += colorCoords.getBufferLimit() * 4;
+        }
+        if (textureCoords != null) {
+            final TextureState ts = (TextureState) context.getCurrentState(RenderState.StateType.Texture);
+            int offset = 0;
+            if (ts != null) {
+                offset = ts.getTextureCoordinateOffset();
+
+                for (int i = 0; i < ts.getNumberOfSetTextures() && i < caps.getNumberOfFragmentTexCoordUnits(); i++) {
+                    if (textureCoords == null || i >= textureCoords.size()) {
+                        continue;
+                    }
+
+                    final FloatBufferData textureBufferData = textureCoords.get(i + offset);
+                    if (textureBufferData != null) {
+                        bufferSize += textureBufferData.getBufferLimit() * 4;
+                    }
+                }
+            }
+        }
+        if (vertexCoords != null) {
+            bufferSize += vertexCoords.getBufferLimit() * 4;
+        }
+
+        return bufferSize;
     }
 }
