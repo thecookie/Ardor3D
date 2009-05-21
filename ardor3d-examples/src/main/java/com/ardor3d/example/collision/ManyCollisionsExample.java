@@ -75,7 +75,7 @@ public class ManyCollisionsExample extends ExampleBase {
 
     @Override
     protected void initExample() {
-        _canvas.setTitle("TestSharedMesh");
+        _canvas.setTitle("ManyCollisionsExample");
 
         t = BasicText.createDefaultTextLabel("Text", "");
         t.getSceneHints().setRenderBucketType(RenderBucketType.Ortho);
