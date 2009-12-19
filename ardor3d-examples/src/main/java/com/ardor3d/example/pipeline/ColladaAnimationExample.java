@@ -187,7 +187,7 @@ public class ColladaAnimationExample extends ExampleBase {
             final long time = System.currentTimeMillis();
             final ColladaImporter colladaImporter = new ColladaImporter();
 
-            colladaStorage = colladaImporter.readColladaFile("collada/sony/Seymour.dae");
+            colladaStorage = colladaImporter.load("collada/sony/Seymour.dae");
             colladaNode = colladaStorage.getScene();
 
             System.err.println("took " + (System.currentTimeMillis() - time) + " ms");

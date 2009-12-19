@@ -178,7 +178,7 @@ public class ColladaExample extends ExampleBase {
             final ColladaImporter colladaImporter = new ColladaImporter();
 
             // Load the collada scene
-            final ColladaStorage storage = colladaImporter.readColladaFile(file);
+            final ColladaStorage storage = colladaImporter.load(file);
             colladaNode = storage.getScene();
 
             // Set dynamic node culling

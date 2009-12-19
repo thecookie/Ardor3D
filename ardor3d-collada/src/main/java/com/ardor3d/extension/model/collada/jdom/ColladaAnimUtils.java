@@ -1,14 +1,27 @@
-/**
- * Copyright (c) 2008-2009 Ardor Labs, Inc.
- *
- * This file is part of Ardor3D.
- *
- * Ardor3D is free software: you can redistribute it and/or modify it
- * under the terms of its license which may be found in the accompanying
- * LICENSE file or at <http://www.ardor3d.com/LICENSE>.
- */
-
 package com.ardor3d.extension.model.collada.jdom;
+
+import com.ardor3d.extension.animation.skeletal.Joint;
+import com.ardor3d.extension.animation.skeletal.Skeleton;
+import com.ardor3d.extension.animation.skeletal.SkeletonPose;
+import com.ardor3d.extension.animation.skeletal.SkinnedMesh;
+import com.ardor3d.extension.model.collada.jdom.data.ColladaStorage;
+import com.ardor3d.extension.model.collada.jdom.data.DataCache;
+import com.ardor3d.extension.model.collada.jdom.data.MeshVertPairs;
+import com.ardor3d.extension.model.collada.jdom.data.SkinData;
+import com.ardor3d.math.Matrix4;
+import com.ardor3d.math.Transform;
+import com.ardor3d.renderer.state.RenderState;
+import com.ardor3d.scenegraph.Mesh;
+import com.ardor3d.scenegraph.MeshData;
+import com.ardor3d.scenegraph.Node;
+import com.ardor3d.scenegraph.Spatial;
+import com.ardor3d.util.export.Savable;
+import com.ardor3d.util.export.binary.BinaryExporter;
+import com.ardor3d.util.export.binary.BinaryImporter;
+import com.ardor3d.util.geom.BufferUtils;
+import com.google.common.collect.Lists;
+import org.jdom.DataConversionException;
+import org.jdom.Element;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -20,482 +33,448 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.logging.Logger;
 
-import org.jdom.DataConversionException;
-import org.jdom.Element;
-
-import com.ardor3d.extension.animation.skeletal.Joint;
-import com.ardor3d.extension.animation.skeletal.Skeleton;
-import com.ardor3d.extension.animation.skeletal.SkeletonPose;
-import com.ardor3d.extension.animation.skeletal.SkinnedMesh;
-import com.ardor3d.extension.model.collada.jdom.ColladaInputPipe.ParamType;
-import com.ardor3d.extension.model.collada.jdom.data.GlobalData;
-import com.ardor3d.extension.model.collada.jdom.data.MeshVertPairs;
-import com.ardor3d.extension.model.collada.jdom.data.SkinData;
-import com.ardor3d.math.Matrix4;
-import com.ardor3d.math.Transform;
-import com.ardor3d.renderer.state.RenderState;
-import com.ardor3d.renderer.state.RenderState.StateType;
-import com.ardor3d.scenegraph.Mesh;
-import com.ardor3d.scenegraph.MeshData;
-import com.ardor3d.scenegraph.Node;
-import com.ardor3d.scenegraph.Spatial;
-import com.ardor3d.util.export.Savable;
-import com.ardor3d.util.export.binary.BinaryExporter;
-import com.ardor3d.util.export.binary.BinaryImporter;
-import com.ardor3d.util.geom.BufferUtils;
-import com.google.common.collect.Lists;
-
-/**
- * Utility functions useful for parsing Collada data related to skinning and morphing.
- */
 public class ColladaAnimUtils {
-    private static final Logger logger = Logger.getLogger(ColladaAnimUtils.class.getName());
+	private static final Logger logger = Logger.getLogger(ColladaAnimUtils.class.getName());
+	private ColladaStorage colladaStorage;
+	private DataCache dataCache;
+	private ColladaDOMUtil colladaDOMUtil;
+	private ColladaMeshUtils colladaMeshUtils;
 
-    /**
-     * Construct skin mesh(es) from the skin element and attach them (under a single new Node) to the given parent Node.
-     * 
-     * @param ardorParentNode
-     *            Ardor3D Node to attach our skin node to.
-     * @param instanceController
-     *            the <instance_controller> element. We'll parse the skeleon reference from here.
-     * @param controller
-     *            the referenced <controller> element. Used for naming purposes.
-     * @param skin
-     *            our <skin> element.
-     */
-    @SuppressWarnings("unchecked")
-    public static void buildSkinMeshes(final Node ardorParentNode, final Element instanceController,
-            final Element controller, final Element skin) {
-        final String skinSource = skin.getAttributeValue("source");
+	public ColladaAnimUtils(ColladaStorage colladaStorage, DataCache dataCache, ColladaDOMUtil colladaDOMUtil, ColladaMeshUtils colladaMeshUtils) {
+		this.colladaStorage = colladaStorage;
+		this.dataCache = dataCache;
+		this.colladaDOMUtil = colladaDOMUtil;
+		this.colladaMeshUtils = colladaMeshUtils;
+	}
 
-        final Element skinNodeEL = ColladaDOMUtil.findTargetWithId(skinSource);
-        if (skinNodeEL == null || !"geometry".equals(skinNodeEL.getName())) {
-            throw new ColladaException("Expected a mesh for skin source with url: " + skinSource
-                    + " (line number is referring skin)", controller.getChild("skin"));
-        }
+	/**
+	 * Construct skin mesh(es) from the skin element and attach them (under a single new Node) to the given parent Node.
+	 *
+	 * @param ardorParentNode	 Ardor3D Node to attach our skin node to.
+	 * @param instanceController the <instance_controller> element. We'll parse the skeleon reference from here.
+	 * @param controller			the referenced <controller> element. Used for naming purposes.
+	 * @param skin					our <skin> element.
+	 */
+	@SuppressWarnings("unchecked")
+	public void buildSkinMeshes(final Node ardorParentNode, final Element instanceController,
+										 final Element controller, final Element skin) {
+		final String skinSource = skin.getAttributeValue("source");
 
-        final Element geometry = skinNodeEL;
+		final Element skinNodeEL = colladaDOMUtil.findTargetWithId(skinSource);
+		if (skinNodeEL == null || !"geometry".equals(skinNodeEL.getName())) {
+			throw new ColladaException("Expected a mesh for skin source with url: " + skinSource
+					+ " (line number is referring skin)", controller.getChild("skin"));
+		}
 
-        final Node meshNode = ColladaMeshUtils.buildMesh(geometry);
-        if (meshNode != null) {
-            // Look for skeleton entries in the original <instance_controller> element
-            final List<Element> skeletonRoots = Lists.newArrayList();
-            for (final Element sk : (List<Element>) instanceController.getChildren("skeleton")) {
-                final Element skroot = ColladaDOMUtil.findTargetWithId(sk.getText());
-                if (skroot != null) {
-                    // add as a possible root for when we need to locate a joint by name later.
-                    skeletonRoots.add(skroot);
-                } else {
-                    throw new ColladaException("Unable to find node with id: " + sk.getText()
-                            + ", referenced from skeleton " + sk, sk);
-                }
-            }
+		final Element geometry = skinNodeEL;
 
-            // Read in our joints node
-            final Element jointsEL = skin.getChild("joints");
-            if (jointsEL == null) {
-                throw new ColladaException("skin found without joints.", skin);
-            }
+		final Node meshNode = colladaMeshUtils.buildMesh(geometry);
+		if (meshNode != null) {
+			// Look for skeleton entries in the original <instance_controller> element
+			final List<Element> skeletonRoots = Lists.newArrayList();
+			for (final Element sk : (List<Element>) instanceController.getChildren("skeleton")) {
+				final Element skroot = colladaDOMUtil.findTargetWithId(sk.getText());
+				if (skroot != null) {
+					// add as a possible root for when we need to locate a joint by name later.
+					skeletonRoots.add(skroot);
+				} else {
+					throw new ColladaException("Unable to find node with id: " + sk.getText()
+							+ ", referenced from skeleton " + sk, sk);
+				}
+			}
 
-            // Pull out our joint names and bind matrices
-            final List<String> jointNames = Lists.newArrayList();
-            final List<Transform> bindMatrices = Lists.newArrayList();
-            final List<ColladaInputPipe.ParamType> paramTypes = Lists.newArrayList();
+			// Read in our joints node
+			final Element jointsEL = skin.getChild("joints");
+			if (jointsEL == null) {
+				throw new ColladaException("skin found without joints.", skin);
+			}
 
-            for (final Element inputEL : (List<Element>) jointsEL.getChildren("input")) {
-                final ColladaInputPipe pipe = new ColladaInputPipe(inputEL);
-                final ColladaInputPipe.SourceData sd = pipe.getSourceData();
-                if (pipe.getType() == ColladaInputPipe.Type.JOINT) {
-                    final String[] namesData = sd.stringArray;
-                    for (int i = sd.offset; i < namesData.length; i += sd.stride) {
-                        jointNames.add(namesData[i]);
-                        paramTypes.add(sd.paramType);
-                    }
-                } else if (pipe.getType() == ColladaInputPipe.Type.INV_BIND_MATRIX) {
-                    final float[] floatData = sd.floatArray;
-                    final FloatBuffer source = BufferUtils.createFloatBufferOnHeap(16);
-                    for (int i = sd.offset; i < floatData.length; i += sd.stride) {
-                        source.rewind();
-                        source.put(floatData, i, 16);
-                        source.flip();
-                        final Matrix4 mat = new Matrix4().fromFloatBuffer(source);
-                        bindMatrices.add(new Transform().fromHomogeneousMatrix(mat));
-                    }
-                }
-            }
+			// Pull out our joint names and bind matrices
+			final List<String> jointNames = Lists.newArrayList();
+			final List<Transform> bindMatrices = Lists.newArrayList();
+			final List<ColladaInputPipe.ParamType> paramTypes = Lists.newArrayList();
 
-            // Make a joint array with name and inverse bind matrix
-            final Joint[] joints = new Joint[jointNames.size()];
-            for (int i = 0; i < joints.length; i++) {
-                joints[i] = new Joint(jointNames.get(i));
-                if (bindMatrices.size() > i) {
-                    joints[i].setInverseBindPose(bindMatrices.get(i));
-                }
-            }
+			for (final Element inputEL : (List<Element>) jointsEL.getChildren("input")) {
+				final ColladaInputPipe pipe = new ColladaInputPipe(colladaDOMUtil, inputEL);
+				final ColladaInputPipe.SourceData sd = pipe.getSourceData();
+				if (pipe.getType() == ColladaInputPipe.Type.JOINT) {
+					final String[] namesData = sd.stringArray;
+					for (int i = sd.offset; i < namesData.length; i += sd.stride) {
+						jointNames.add(namesData[i]);
+						paramTypes.add(sd.paramType);
+					}
+				} else if (pipe.getType() == ColladaInputPipe.Type.INV_BIND_MATRIX) {
+					final float[] floatData = sd.floatArray;
+					final FloatBuffer source = BufferUtils.createFloatBufferOnHeap(16);
+					for (int i = sd.offset; i < floatData.length; i += sd.stride) {
+						source.rewind();
+						source.put(floatData, i, 16);
+						source.flip();
+						final Matrix4 mat = new Matrix4().fromFloatBuffer(source);
+						bindMatrices.add(new Transform().fromHomogeneousMatrix(mat));
+					}
+				}
+			}
 
-            // Use the skeleton information from the instance_controller to set the parent array locations on the
-            // joints.
-            for (int i = 0; i < joints.length; i++) {
-                final Joint joint = joints[i];
-                final ParamType paramType = paramTypes.get(i);
-                final String searcher = paramType == ParamType.idref_param ? "id" : "sid";
-                final String name = joint.getName();
-                Element found = null;
-                for (final Element root : skeletonRoots) {
-                    if (name.equals(root.getAttributeValue(searcher))) {
-                        found = root;
-                    } else if (paramType == ParamType.idref_param) {
-                        found = ColladaDOMUtil.findTargetWithId(name);
-                    } else {
-                        found = (Element) ColladaDOMUtil.selectSingleNode(root, ".//*[@sid='" + name + "']");
-                    }
+			// Make a joint array with name and inverse bind matrix
+			final Joint[] joints = new Joint[jointNames.size()];
+			for (int i = 0; i < joints.length; i++) {
+				joints[i] = new Joint(jointNames.get(i));
+				if (bindMatrices.size() > i) {
+					joints[i].setInverseBindPose(bindMatrices.get(i));
+				}
+			}
 
-                    // Last resorts (bad exporters)
-                    if (found == null) {
-                        found = ColladaDOMUtil.findTargetWithId(name);
-                    }
-                    if (found == null) {
-                        found = (Element) ColladaDOMUtil.selectSingleNode(root, ".//*[@name='" + name + "']");
-                    }
+			// Use the skeleton information from the instance_controller to set the parent array locations on the
+			// joints.
+			for (int i = 0; i < joints.length; i++) {
+				final Joint joint = joints[i];
+				final ColladaInputPipe.ParamType paramType = paramTypes.get(i);
+				final String searcher = paramType == ColladaInputPipe.ParamType.idref_param ? "id" : "sid";
+				final String name = joint.getName();
+				Element found = null;
+				for (final Element root : skeletonRoots) {
+					if (name.equals(root.getAttributeValue(searcher))) {
+						found = root;
+					} else if (paramType == ColladaInputPipe.ParamType.idref_param) {
+						found = colladaDOMUtil.findTargetWithId(name);
+					} else {
+						found = (Element) colladaDOMUtil.selectSingleNode(root, ".//*[@sid='" + name + "']");
+					}
 
-                    if (found != null) {
-                        break;
-                    }
-                }
-                if (found == null) {
-                    if (paramType == ParamType.idref_param) {
-                        found = ColladaDOMUtil.findTargetWithId(name);
-                    } else {
-                        found = (Element) ColladaDOMUtil.selectSingleNode(geometry, "/*//visual_scene//*[@sid='" + name
-                                + "']");
-                    }
+					// Last resorts (bad exporters)
+					if (found == null) {
+						found = colladaDOMUtil.findTargetWithId(name);
+					}
+					if (found == null) {
+						found = (Element) colladaDOMUtil.selectSingleNode(root, ".//*[@name='" + name + "']");
+					}
 
-                    // Last resorts (bad exporters)
-                    if (found == null) {
-                        found = ColladaDOMUtil.findTargetWithId(name);
-                    }
-                    if (found == null) {
-                        found = (Element) ColladaDOMUtil.selectSingleNode(geometry, "/*//visual_scene//*[@name='"
-                                + name + "']");
-                    }
+					if (found != null) {
+						break;
+					}
+				}
+				if (found == null) {
+					if (paramType == ColladaInputPipe.ParamType.idref_param) {
+						found = colladaDOMUtil.findTargetWithId(name);
+					} else {
+						found = (Element) colladaDOMUtil.selectSingleNode(geometry, "/*//visual_scene//*[@sid='" + name + "']");
+					}
 
-                    if (found == null) {
-                        throw new ColladaException("Unable to find joint with " + searcher + ": " + name, skin);
-                    }
-                }
-                if (found.getParentElement() != null) {
-                    String parName = found.getParentElement().getAttributeValue(searcher);
+					// Last resorts (bad exporters)
+					if (found == null) {
+						found = colladaDOMUtil.findTargetWithId(name);
+					}
+					if (found == null) {
+						found = (Element) colladaDOMUtil.selectSingleNode(geometry, "/*//visual_scene//*[@name='" + name + "']");
+					}
 
-                    // Last resort (bad exporters)
-                    if (parName == null) {
-                        parName = found.getParentElement().getAttributeValue("id");
-                    }
-                    if (parName == null) {
-                        parName = found.getParentElement().getAttributeValue("name");
-                    }
+					if (found == null) {
+						throw new ColladaException("Unable to find joint with " + searcher + ": " + name, skin);
+					}
+				}
+				if (found.getParentElement() != null) {
+					String parName = found.getParentElement().getAttributeValue(searcher);
 
-                    if (parName != null) {
-                        final int index = jointNames.indexOf(parName);
-                        if (index >= 0) {
-                            // found a valid index, so set on joint.
-                            joint.setParentIndex((short) index);
-                            continue;
-                        }
-                    }
-                }
-                // no parent, so it's a root bone
-                joint.setParentIndex(Joint.NO_PARENT);
-            }
+					// Last resort (bad exporters)
+					if (parName == null) {
+						parName = found.getParentElement().getAttributeValue("id");
+					}
+					if (parName == null) {
+						parName = found.getParentElement().getAttributeValue("name");
+					}
 
-            // Make our skeleton
-            final Skeleton ourSkeleton = new Skeleton("skeleton", joints);
-            final SkeletonPose skPose = new SkeletonPose(ourSkeleton);
-            // Skeleton's default to bind position, so update the global transforms.
-            skPose.updateTransforms();
+					if (parName != null) {
+						final int index = jointNames.indexOf(parName);
+						if (index >= 0) {
+							// found a valid index, so set on joint.
+							joint.setParentIndex((short) index);
+							continue;
+						}
+					}
+				}
+				// no parent, so it's a root bone
+				joint.setParentIndex(Joint.NO_PARENT);
+			}
 
-            // Read in our vertex_weights node
-            final Element weightsEL = skin.getChild("vertex_weights");
-            if (weightsEL == null) {
-                throw new ColladaException("skin found without vertex_weights.", skin);
-            }
+			// Make our skeleton
+			final Skeleton ourSkeleton = new Skeleton("skeleton", joints);
+			final SkeletonPose skPose = new SkeletonPose(ourSkeleton);
+			// Skeleton's default to bind position, so update the global transforms.
+			skPose.updateTransforms();
 
-            // Pull out our per vertex joint indices and weights
-            final List<Short> jointIndices = Lists.newArrayList();
-            final List<Float> jointWeights = Lists.newArrayList();
-            int indOff = 0, weightOff = 0;
+			// Read in our vertex_weights node
+			final Element weightsEL = skin.getChild("vertex_weights");
+			if (weightsEL == null) {
+				throw new ColladaException("skin found without vertex_weights.", skin);
+			}
 
-            int maxOffset = 0;
-            for (final Element inputEL : (List<Element>) weightsEL.getChildren("input")) {
-                final ColladaInputPipe pipe = new ColladaInputPipe(inputEL);
-                final ColladaInputPipe.SourceData sd = pipe.getSourceData();
-                if (pipe.getOffset() > maxOffset) {
-                    maxOffset = pipe.getOffset();
-                }
-                if (pipe.getType() == ColladaInputPipe.Type.JOINT) {
-                    indOff = pipe.getOffset();
-                    final String[] namesData = sd.stringArray;
-                    for (int i = sd.offset; i < namesData.length; i += sd.stride) {
-                        // XXX: the Collada spec says this could be -1?
-                        final String name = namesData[i];
-                        final int index = jointNames.indexOf(name);
-                        if (index >= 0) {
-                            jointIndices.add((short) index);
-                        } else {
-                            throw new ColladaException("Unknown joint accessed: " + name, inputEL);
-                        }
-                    }
-                } else if (pipe.getType() == ColladaInputPipe.Type.WEIGHT) {
-                    weightOff = pipe.getOffset();
-                    final float[] floatData = sd.floatArray;
-                    for (int i = sd.offset; i < floatData.length; i += sd.stride) {
-                        jointWeights.add(floatData[i]);
-                    }
-                }
-            }
+			// Pull out our per vertex joint indices and weights
+			final List<Short> jointIndices = Lists.newArrayList();
+			final List<Float> jointWeights = Lists.newArrayList();
+			int indOff = 0, weightOff = 0;
 
-            // Pull our values array
-            int firstIndex = 0, count = 0;
-            final int[] vals = ColladaDOMUtil.parseIntArray(weightsEL.getChild("v"));
-            try {
-                count = weightsEL.getAttribute("count").getIntValue();
-            } catch (final DataConversionException e) {
-                throw new ColladaException("Unable to parse count attribute.", weightsEL);
-            }
-            // use the vals to fill our vert weight map
-            final int[][] vertWeightMap = new int[count][];
-            int index = 0;
-            for (final int length : ColladaDOMUtil.parseIntArray(weightsEL.getChild("vcount"))) {
-                final int[] entry = new int[(maxOffset + 1) * length];
-                vertWeightMap[index++] = entry;
+			int maxOffset = 0;
+			for (final Element inputEL : (List<Element>) weightsEL.getChildren("input")) {
+				final ColladaInputPipe pipe = new ColladaInputPipe(colladaDOMUtil, inputEL);
+				final ColladaInputPipe.SourceData sd = pipe.getSourceData();
+				if (pipe.getOffset() > maxOffset) {
+					maxOffset = pipe.getOffset();
+				}
+				if (pipe.getType() == ColladaInputPipe.Type.JOINT) {
+					indOff = pipe.getOffset();
+					final String[] namesData = sd.stringArray;
+					for (int i = sd.offset; i < namesData.length; i += sd.stride) {
+						// XXX: the Collada spec says this could be -1?
+						final String name = namesData[i];
+						final int index = jointNames.indexOf(name);
+						if (index >= 0) {
+							jointIndices.add((short) index);
+						} else {
+							throw new ColladaException("Unknown joint accessed: " + name, inputEL);
+						}
+					}
+				} else if (pipe.getType() == ColladaInputPipe.Type.WEIGHT) {
+					weightOff = pipe.getOffset();
+					final float[] floatData = sd.floatArray;
+					for (int i = sd.offset; i < floatData.length; i += sd.stride) {
+						jointWeights.add(floatData[i]);
+					}
+				}
+			}
 
-                System.arraycopy(vals, (maxOffset + 1) * firstIndex, entry, 0, entry.length);
+			// Pull our values array
+			int firstIndex = 0;
+			int count;
+			final int[] vals = colladaDOMUtil.parseIntArray(weightsEL.getChild("v"));
+			try {
+				count = weightsEL.getAttribute("count").getIntValue();
+			} catch (final DataConversionException e) {
+				throw new ColladaException("Unable to parse count attribute.", weightsEL);
+			}
+			// use the vals to fill our vert weight map
+			final int[][] vertWeightMap = new int[count][];
+			int index = 0;
+			for (final int length : colladaDOMUtil.parseIntArray(weightsEL.getChild("vcount"))) {
+				final int[] entry = new int[(maxOffset + 1) * length];
+				vertWeightMap[index++] = entry;
 
-                firstIndex += length;
-            }
+				System.arraycopy(vals, (maxOffset + 1) * firstIndex, entry, 0, entry.length);
 
-            // Create a record for the global ColladaStorage.
-            final String storeName = ColladaAnimUtils.getSkinStoreName(instanceController, controller);
-            final SkinData skinDataStore = new SkinData(storeName);
-            // add pose to store
-            skinDataStore.setPose(skPose);
+				firstIndex += length;
+			}
 
-            // Create a base Node for our skin meshes
-            final Node skinNode = new Node(meshNode.getName());
-            // copy Node render states across.
-            ColladaAnimUtils.copyRenderStates(meshNode, skinNode);
-            // add node to store
-            skinDataStore.setSkinBaseNode(skinNode);
+			// Create a record for the global ColladaStorage.
+			final String storeName = getSkinStoreName(instanceController, controller);
+			final SkinData skinDataStore = new SkinData(storeName);
+			// add pose to store
+			skinDataStore.setPose(skPose);
 
-            // Grab the bind_shape_matrix from skin
-            final Element bindShapeMatrixEL = skin.getChild("bind_shape_matrix");
-            final Transform bindShapeMatrix = new Transform();
-            if (bindShapeMatrixEL != null) {
-                final double[] array = ColladaDOMUtil.parseDoubleArray(bindShapeMatrixEL);
-                bindShapeMatrix.fromHomogeneousMatrix(new Matrix4().fromArray(array));
-            }
+			// Create a base Node for our skin meshes
+			final Node skinNode = new Node(meshNode.getName());
+			// copy Node render states across.
+			copyRenderStates(meshNode, skinNode);
+			// add node to store
+			skinDataStore.setSkinBaseNode(skinNode);
 
-            // Visit our Node and pull out any Mesh children. Turn them into SkinnedMeshes
-            for (final Spatial spat : meshNode.getChildren()) {
-                if (spat instanceof Mesh) {
-                    final Mesh sourceMesh = (Mesh) spat;
-                    final SkinnedMesh skMesh = new SkinnedMesh(sourceMesh.getName());
-                    skMesh.setCurrentPose(skPose);
+			// Grab the bind_shape_matrix from skin
+			final Element bindShapeMatrixEL = skin.getChild("bind_shape_matrix");
+			final Transform bindShapeMatrix = new Transform();
+			if (bindShapeMatrixEL != null) {
+				final double[] array = colladaDOMUtil.parseDoubleArray(bindShapeMatrixEL);
+				bindShapeMatrix.fromHomogeneousMatrix(new Matrix4().fromArray(array));
+			}
 
-                    // copy mesh render states across.
-                    ColladaAnimUtils.copyRenderStates(sourceMesh, skMesh);
+			// Visit our Node and pull out any Mesh children. Turn them into SkinnedMeshes
+			for (final Spatial spat : meshNode.getChildren()) {
+				if (spat instanceof Mesh) {
+					final Mesh sourceMesh = (Mesh) spat;
+					final SkinnedMesh skMesh = new SkinnedMesh(sourceMesh.getName());
+					skMesh.setCurrentPose(skPose);
 
-                    try {
-                        // Use source mesh as bind pose data in the new SkinnedMesh
-                        final MeshData bindPose = ColladaAnimUtils.copyMeshData(sourceMesh.getMeshData());
-                        skMesh.setBindPoseData(bindPose);
+					// copy mesh render states across.
+					copyRenderStates(sourceMesh, skMesh);
 
-                        // Apply our BSM
-                        if (!bindShapeMatrix.isIdentity()) {
-                            bindPose.transformVertices(bindShapeMatrix);
-                            if (bindPose.getNormalBuffer() != null) {
-                                bindPose.transformNormals(bindShapeMatrix, true);
-                            }
-                        }
+					try {
+						// Use source mesh as bind pose data in the new SkinnedMesh
+						final MeshData bindPose = copyMeshData(sourceMesh.getMeshData());
+						skMesh.setBindPoseData(bindPose);
 
-                        // TODO: This is only needed for CPU skinning... consider a way of making it optional.
-                        // Copy bind pose to mesh data to setup for CPU skinning
-                        skMesh.setMeshData(ColladaAnimUtils.copyMeshData(skMesh.getBindPoseData()));
-                    } catch (final IOException e) {
-                        e.printStackTrace();
-                        throw new ColladaException("Unable to copy skeleton bind pose data.", geometry);
-                    }
+						// Apply our BSM
+						if (!bindShapeMatrix.isIdentity()) {
+							bindPose.transformVertices(bindShapeMatrix);
+							if (bindPose.getNormalBuffer() != null) {
+								bindPose.transformNormals(bindShapeMatrix, true);
+							}
+						}
 
-                    // Grab the MeshVertPairs from Global for this mesh.
-                    final Collection<MeshVertPairs> vertPairsList = GlobalData.getInstance().getVertMappings().get(
-                            geometry);
-                    MeshVertPairs pairsMap = null;
-                    if (vertPairsList != null) {
-                        for (final MeshVertPairs pairs : vertPairsList) {
-                            if (pairs.mesh == sourceMesh) {
-                                pairsMap = pairs;
-                            }
-                        }
-                    }
+						// TODO: This is only needed for CPU skinning... consider a way of making it optional.
+						// Copy bind pose to mesh data to setup for CPU skinning
+						skMesh.setMeshData(copyMeshData(skMesh.getBindPoseData()));
+					} catch (final IOException e) {
+						e.printStackTrace();
+						throw new ColladaException("Unable to copy skeleton bind pose data.", geometry);
+					}
 
-                    if (pairsMap == null) {
-                        throw new ColladaException("Unable to locate pair map for geometry.", geometry);
-                    }
+					// Grab the MeshVertPairs from Global for this mesh.
+					final Collection<MeshVertPairs> vertPairsList = dataCache.getVertMappings().get(geometry);
+					MeshVertPairs pairsMap = null;
+					if (vertPairsList != null) {
+						for (final MeshVertPairs pairs : vertPairsList) {
+							if (pairs.getMesh() == sourceMesh) {
+								pairsMap = pairs;
+							}
+						}
+					}
 
-                    // Use pairs map and vertWeightMap to build our weights and joint indices.
-                    {
-                        final FloatBuffer weightBuffer = BufferUtils.createFloatBuffer(pairsMap.indices.length
-                                * SkinnedMesh.MAX_JOINTS_PER_VERTEX);
-                        final ShortBuffer jointIndexBuffer = BufferUtils.createShortBuffer(pairsMap.indices.length
-                                * SkinnedMesh.MAX_JOINTS_PER_VERTEX);
-                        int j;
-                        float sum = 0;
-                        final float[] weights = new float[SkinnedMesh.MAX_JOINTS_PER_VERTEX];
-                        final short[] indices = new short[SkinnedMesh.MAX_JOINTS_PER_VERTEX];
-                        for (final int originalIndex : pairsMap.indices) {
-                            j = 0;
-                            sum = 0;
+					if (pairsMap == null) {
+						throw new ColladaException("Unable to locate pair map for geometry.", geometry);
+					}
 
-                            // get first 4 weights and joints at original index and add weights up to get divisor sum
-                            final int[] data = vertWeightMap[originalIndex];
-                            for (int i = 0; i < data.length; i += maxOffset + 1) {
-                                final float weight = jointWeights.get(data[i + weightOff]);
-                                if (weight != 0) {
-                                    if (j >= SkinnedMesh.MAX_JOINTS_PER_VERTEX) {
-                                        ColladaAnimUtils.logger.warning("Max of " + SkinnedMesh.MAX_JOINTS_PER_VERTEX
-                                                + " joints supported per vertex.  Found " + (j + 1));
-                                    } else {
-                                        weights[j] = jointWeights.get(data[i + weightOff]);
-                                        indices[j] = jointIndices.get(data[i + indOff]);
-                                        sum += weights[j++];
-                                    }
-                                }
-                            }
-                            // add extra padding as needed
-                            while (j < SkinnedMesh.MAX_JOINTS_PER_VERTEX) {
-                                weights[j] = 0;
-                                indices[j++] = 0;
-                            }
-                            // add weights to weightBuffer / sum
-                            for (final float w : weights) {
-                                weightBuffer.put(w / sum);
-                            }
-                            // add joint indices to jointIndexBuffer
-                            jointIndexBuffer.put(indices);
-                        }
+					// Use pairs map and vertWeightMap to build our weights and joint indices.
+					{
+						final FloatBuffer weightBuffer = BufferUtils.createFloatBuffer(pairsMap.getIndices().length * SkinnedMesh.MAX_JOINTS_PER_VERTEX);
+						final ShortBuffer jointIndexBuffer = BufferUtils.createShortBuffer(pairsMap.getIndices().length * SkinnedMesh.MAX_JOINTS_PER_VERTEX);
+						int j;
+						float sum = 0;
+						final float[] weights = new float[SkinnedMesh.MAX_JOINTS_PER_VERTEX];
+						final short[] indices = new short[SkinnedMesh.MAX_JOINTS_PER_VERTEX];
+						for (final int originalIndex : pairsMap.getIndices()) {
+							j = 0;
+							sum = 0;
 
-                        skMesh.setWeights(weightBuffer);
-                        skMesh.setJointIndices(jointIndexBuffer);
-                    }
+							// get first 4 weights and joints at original index and add weights up to get divisor sum
+							final int[] data = vertWeightMap[originalIndex];
+							for (int i = 0; i < data.length; i += maxOffset + 1) {
+								final float weight = jointWeights.get(data[i + weightOff]);
+								if (weight != 0) {
+									if (j >= SkinnedMesh.MAX_JOINTS_PER_VERTEX) {
+										ColladaAnimUtils.logger.warning("Max of " + SkinnedMesh.MAX_JOINTS_PER_VERTEX
+												+ " joints supported per vertex.  Found " + (j + 1));
+									} else {
+										weights[j] = jointWeights.get(data[i + weightOff]);
+										indices[j] = jointIndices.get(data[i + indOff]);
+										sum += weights[j++];
+									}
+								}
+							}
+							// add extra padding as needed
+							while (j < SkinnedMesh.MAX_JOINTS_PER_VERTEX) {
+								weights[j] = 0;
+								indices[j++] = 0;
+							}
+							// add weights to weightBuffer / sum
+							for (final float w : weights) {
+								weightBuffer.put(w / sum);
+							}
+							// add joint indices to jointIndexBuffer
+							jointIndexBuffer.put(indices);
+						}
 
-                    // add to the skinNode.
-                    skinNode.attachChild(skMesh);
+						skMesh.setWeights(weightBuffer);
+						skMesh.setJointIndices(jointIndexBuffer);
+					}
 
-                    // Apply our bind pose to the skin mesh.
-                    skMesh.applyPose();
+					// add to the skinNode.
+					skinNode.attachChild(skMesh);
 
-                    // Update the model bounding.
-                    skMesh.updateModelBound();
+					// Apply our bind pose to the skin mesh.
+					skMesh.applyPose();
 
-                    // add mesh to store
-                    skinDataStore.getSkins().add(skMesh);
-                }
-            }
+					// Update the model bounding.
+					skMesh.updateModelBound();
 
-            // add to Node
-            ardorParentNode.attachChild(skinNode);
+					// add mesh to store
+					skinDataStore.getSkins().add(skMesh);
+				}
+			}
 
-            // Add skin record to storage.
-            GlobalData.getInstance().getColladaStorage().getSkins().add(skinDataStore);
-        }
-    }
+			// add to Node
+			ardorParentNode.attachChild(skinNode);
 
-    /**
-     * Retrieve a name to use for the skin node based on the element names.
-     * 
-     * @param ic
-     *            instance_controller element.
-     * @param controller
-     *            controller element
-     * @return name.
-     * @see SkinData#SkinData(String)
-     */
-    private static String getSkinStoreName(final Element ic, final Element controller) {
-        final String controllerName = controller.getAttributeValue("name", (String) null) != null ? controller
-                .getAttributeValue("name", (String) null) : controller.getAttributeValue("id", (String) null);
-        final String instanceControllerName = ic.getAttributeValue("name", (String) null) != null ? ic
-                .getAttributeValue("name", (String) null) : ic.getAttributeValue("sid", (String) null);
-        final String storeName = (controllerName != null ? controllerName : "")
-                + (controllerName != null && instanceControllerName != null ? " : " : "")
-                + (instanceControllerName != null ? instanceControllerName : "");
-        return storeName;
-    }
+			// Add skin record to storage.
+			colladaStorage.getSkins().add(skinDataStore);
+		}
+	}
 
-    /**
-     * Copy the render states from our source Spatial to the destination Spatial. Does not recurse.
-     * 
-     * @param source
-     * @param target
-     */
-    private static void copyRenderStates(final Spatial source, final Spatial target) {
-        final EnumMap<StateType, RenderState> states = source.getLocalRenderStates();
-        for (final RenderState state : states.values()) {
-            target.setRenderState(state);
-        }
-    }
+	/**
+	 * Retrieve a name to use for the skin node based on the element names.
+	 *
+	 * @param ic			instance_controller element.
+	 * @param controller controller element
+	 * @return name.
+	 * @see SkinData#SkinData(String)
+	 */
+	private String getSkinStoreName(final Element ic, final Element controller) {
+		final String controllerName = controller.getAttributeValue("name", (String) null) != null ? controller
+				.getAttributeValue("name", (String) null) : controller.getAttributeValue("id", (String) null);
+		final String instanceControllerName = ic.getAttributeValue("name", (String) null) != null ? ic
+				.getAttributeValue("name", (String) null) : ic.getAttributeValue("sid", (String) null);
+		final String storeName = (controllerName != null ? controllerName : "")
+				+ (controllerName != null && instanceControllerName != null ? " : " : "")
+				+ (instanceControllerName != null ? instanceControllerName : "");
+		return storeName;
+	}
 
-    /**
-     * Clone the given MeshData object via deep copy using the Ardor3D BinaryExporter and BinaryImporter.
-     * 
-     * @param meshData
-     *            the source to clone.
-     * @return the clone.
-     * @throws IOException
-     *             if we have troubles during the clone.
-     */
-    private static MeshData copyMeshData(final MeshData meshData) throws IOException {
-        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        final BinaryExporter exporter = new BinaryExporter();
-        exporter.save(meshData, bos);
-        bos.flush();
-        final ByteArrayInputStream bis = new ByteArrayInputStream(bos.toByteArray());
-        final BinaryImporter importer = new BinaryImporter();
-        final Savable sav = importer.load(bis);
-        return (MeshData) sav;
-    }
+	/**
+	 * Copy the render states from our source Spatial to the destination Spatial. Does not recurse.
+	 *
+	 * @param source
+	 * @param target
+	 */
+	private void copyRenderStates(final Spatial source, final Spatial target) {
+		final EnumMap<RenderState.StateType, RenderState> states = source.getLocalRenderStates();
+		for (final RenderState state : states.values()) {
+			target.setRenderState(state);
+		}
+	}
 
-    /**
-     * Construct morph mesh(es) from the <morph> element and attach them (under a single new Node) to the given parent
-     * Node.
-     * 
-     * Note: This method current does not do anything but attach the referenced mesh since Ardor3D does not yet support
-     * morph target animation.
-     * 
-     * @param ardorParentNode
-     *            Ardor3D Node to attach our morph mesh to.
-     * @param controller
-     *            the referenced <controller> element. Used for naming purposes.
-     * @param morph
-     *            our <morph> element
-     */
-    public static void buildMorphMeshes(final Node ardorParentNode, final Element controller, final Element morph) {
-        final String skinSource = morph.getAttributeValue("source");
+	/**
+	 * Clone the given MeshData object via deep copy using the Ardor3D BinaryExporter and BinaryImporter.
+	 *
+	 * @param meshData the source to clone.
+	 * @return the clone.
+	 * @throws IOException if we have troubles during the clone.
+	 */
+	private MeshData copyMeshData(final MeshData meshData) throws IOException {
+		final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+		final BinaryExporter exporter = new BinaryExporter();
+		exporter.save(meshData, bos);
+		bos.flush();
+		final ByteArrayInputStream bis = new ByteArrayInputStream(bos.toByteArray());
+		final BinaryImporter importer = new BinaryImporter();
+		final Savable sav = importer.load(bis);
+		return (MeshData) sav;
+	}
 
-        final Element skinNode = ColladaDOMUtil.findTargetWithId(skinSource);
-        if (skinNode == null || !"geometry".equals(skinNode.getName())) {
-            throw new ColladaException("Expected a mesh for morph source with url: " + skinSource
-                    + " (line number is referring morph)", controller.getChild("morph"));
-        }
+	/**
+	 * Construct morph mesh(es) from the <morph> element and attach them (under a single new Node) to the given parent
+	 * Node.
+	 * <p/>
+	 * Note: This method current does not do anything but attach the referenced mesh since Ardor3D does not yet support
+	 * morph target animation.
+	 *
+	 * @param ardorParentNode Ardor3D Node to attach our morph mesh to.
+	 * @param controller		the referenced <controller> element. Used for naming purposes.
+	 * @param morph			  our <morph> element
+	 */
+	public void buildMorphMeshes(final Node ardorParentNode, final Element controller, final Element morph) {
+		final String skinSource = morph.getAttributeValue("source");
 
-        final Element geometry = skinNode;
+		final Element skinNode = colladaDOMUtil.findTargetWithId(skinSource);
+		if (skinNode == null || !"geometry".equals(skinNode.getName())) {
+			throw new ColladaException("Expected a mesh for morph source with url: " + skinSource
+					+ " (line number is referring morph)", controller.getChild("morph"));
+		}
 
-        final Spatial baseMesh = ColladaMeshUtils.buildMesh(geometry);
+		final Spatial baseMesh = colladaMeshUtils.buildMesh(skinNode);
 
-        // TODO: support morph animations someday.
-        ColladaAnimUtils.logger.warning("Morph target animation not yet supported.");
+		// TODO: support morph animations someday.
+		ColladaAnimUtils.logger.warning("Morph target animation not yet supported.");
 
-        // Just add mesh.
-        if (baseMesh != null) {
-            ardorParentNode.attachChild(baseMesh);
-        }
-    }
+		// Just add mesh.
+		if (baseMesh != null) {
+			ardorParentNode.attachChild(baseMesh);
+		}
+	}
 }

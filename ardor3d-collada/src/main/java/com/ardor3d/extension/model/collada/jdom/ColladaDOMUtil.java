@@ -1,23 +1,7 @@
-/**
- * Copyright (c) 2008-2009 Ardor Labs, Inc.
- *
- * This file is part of Ardor3D.
- *
- * Ardor3D is free software: you can redistribute it and/or modify it 
- * under the terms of its license which may be found in the accompanying
- * LICENSE file or at <http://www.ardor3d.com/LICENSE>.
- */
-
 package com.ardor3d.extension.model.collada.jdom;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.StringTokenizer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
+import com.ardor3d.extension.model.collada.jdom.data.DataCache;
+import com.ardor3d.math.ColorRGBA;
 import org.jdom.Attribute;
 import org.jdom.CDATA;
 import org.jdom.Comment;
@@ -28,319 +12,327 @@ import org.jdom.ProcessingInstruction;
 import org.jdom.Text;
 import org.jdom.xpath.XPath;
 
-import com.ardor3d.extension.model.collada.jdom.data.GlobalData;
-import com.ardor3d.math.ColorRGBA;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.StringTokenizer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-/**
- * Utility class for finding specific nodes in the collada tree through id/sid or XPath expressions and for parsing
- * arrays and colors.
- */
 public class ColladaDOMUtil {
-    private static final Logger logger = Logger.getLogger(ColladaDOMUtil.class.getName());
+	private final Logger logger = Logger.getLogger(ColladaDOMUtil.class.getName());
+	private final DataCache dataCache;
 
-    /**
-     * Find element with specific id
-     * 
-     * @param baseUrl
-     *            url specifying target id
-     * @return element with specific id or null if not found
-     */
-    public static Element findTargetWithId(final String baseUrl) {
-        return GlobalData.getInstance().getIdCache().get(ColladaDOMUtil.parseUrl(baseUrl));
-    }
+	public ColladaDOMUtil(DataCache dataCache) {
+		this.dataCache = dataCache;
+	}
 
-    /**
-     * Find element with specific sid
-     * 
-     * @param baseUrl
-     *            url specifying target sid
-     * @return element with specific id or null if not found
-     */
-    public static Element findTargetWithSid(final String baseUrl) {
-        return GlobalData.getInstance().getSidCache().get(ColladaDOMUtil.parseUrl(baseUrl));
-    }
+	/**
+	 * Find element with specific id
+	 *
+	 * @param baseUrl url specifying target id
+	 * @return element with specific id or null if not found
+	 */
+	public Element findTargetWithId(final String baseUrl) {
+		return dataCache.getIdCache().get(parseUrl(baseUrl));
+	}
 
-    /**
-     * Select nodes through an XPath query and return all hits as a List
-     * 
-     * @param element
-     *            root element to start search on
-     * @param query
-     *            XPath expression
-     * @return the list of selected items, which may be of types: {@link Element}, {@link Attribute}, {@link Text},
-     *         {@link CDATA}, {@link Comment}, {@link ProcessingInstruction}, Boolean, Double, or String.
-     */
-    public static List<?> selectNodes(final Element element, final String query) {
-        final XPath xPathExpression = ColladaDOMUtil.getXPathExpression(query);
+	/**
+	 * Find element with specific sid
+	 *
+	 * @param baseUrl url specifying target sid
+	 * @return element with specific id or null if not found
+	 */
+	public Element findTargetWithSid(final String baseUrl) {
+		return dataCache.getSidCache().get(parseUrl(baseUrl));
+	}
 
-        try {
-            return xPathExpression.selectNodes(element);
-        } catch (final JDOMException e) {
-            e.printStackTrace();
-        }
-        return Collections.emptyList();
-    }
+	/**
+	 * Select nodes through an XPath query and return all hits as a List
+	 *
+	 * @param element root element to start search on
+	 * @param query	XPath expression
+	 * @return the list of selected items, which may be of types: {@link Element}, {@link Attribute}, {@link Text},
+	 *         {@link CDATA}, {@link Comment}, {@link ProcessingInstruction}, Boolean, Double, or String.
+	 */
+	public List<?> selectNodes(final Element element, final String query) {
+		final XPath xPathExpression = getXPathExpression(query);
 
-    /**
-     * Select nodes through an XPath query and returns the first hit
-     * 
-     * @param element
-     *            root element to start search on
-     * @param query
-     *            XPath expression
-     * @return the first selected item, which may be of types: {@link Element}, {@link Attribute}, {@link Text},
-     *         {@link CDATA}, {@link Comment}, {@link ProcessingInstruction}, Boolean, Double, String, or
-     *         <code>null</code> if no item was selected.
-     */
-    public static Object selectSingleNode(final Element element, final String query) {
-        final XPath xPathExpression = ColladaDOMUtil.getXPathExpression(query);
+		try {
+			return xPathExpression.selectNodes(element);
+		} catch (final JDOMException e) {
+			e.printStackTrace();
+		}
+		return Collections.emptyList();
+	}
 
-        try {
-            return xPathExpression.selectSingleNode(element);
-        } catch (final JDOMException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
+	/**
+	 * Select nodes through an XPath query and returns the first hit
+	 *
+	 * @param element root element to start search on
+	 * @param query	XPath expression
+	 * @return the first selected item, which may be of types: {@link Element}, {@link Attribute}, {@link Text},
+	 *         {@link CDATA}, {@link Comment}, {@link ProcessingInstruction}, Boolean, Double, String, or
+	 *         <code>null</code> if no item was selected.
+	 */
+	public Object selectSingleNode(final Element element, final String query) {
+		final XPath xPathExpression = getXPathExpression(query);
 
-    private static String parseUrl(String baseUrl) {
-        baseUrl = baseUrl.replace("#", "");
-        return baseUrl;
-    }
+		try {
+			return xPathExpression.selectSingleNode(element);
+		} catch (final JDOMException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
 
-    /**
-     * Compiles and return an XPath expression. Expressions are cached.
-     * 
-     * @param query
-     *            XPath query to compile
-     * @return new XPath expression object
-     */
-    private static XPath getXPathExpression(final String query) {
-        if (GlobalData.getInstance().getxPathExpressions().containsKey(query)) {
-            return GlobalData.getInstance().getxPathExpressions().get(query);
-        }
+	private String parseUrl(String baseUrl) {
+		baseUrl = baseUrl.replace("#", "");
+		return baseUrl;
+	}
 
-        XPath xPathExpression = null;
-        try {
-            xPathExpression = XPath.newInstance(query);
-        } catch (final JDOMException e) {
-            e.printStackTrace();
-        }
+	/**
+	 * Compiles and return an XPath expression. Expressions are cached.
+	 *
+	 * @param query XPath query to compile
+	 * @return new XPath expression object
+	 */
+	private XPath getXPathExpression(final String query) {
 
-        GlobalData.getInstance().getxPathExpressions().put(query, xPathExpression);
+		if (dataCache.getxPathExpressions().containsKey(query)) {
+			return dataCache.getxPathExpressions().get(query);
+		}
 
-        return xPathExpression;
-    }
+		XPath xPathExpression = null;
+		try {
+			xPathExpression = XPath.newInstance(query);
+		} catch (final JDOMException e) {
+			e.printStackTrace();
+		}
 
-    /**
-     * Parses the text under a node and returns it as a float array.
-     * 
-     * @param node
-     *            node to parse content from
-     * @return parsed float array
-     */
-    public static float[] parseFloatArray(final Element node) {
-        if (GlobalData.getInstance().getFloatArrays().containsKey(node)) {
-            return GlobalData.getInstance().getFloatArrays().get(node);
-        }
+		dataCache.getxPathExpressions().put(query, xPathExpression);
 
-        final String content = node.getText();
+		return xPathExpression;
+	}
 
-        final List<String> list = new ArrayList<String>();
-        final StringTokenizer tokenizer = new StringTokenizer(content, " ");
-        while (tokenizer.hasMoreTokens()) {
-            list.add(tokenizer.nextToken());
-        }
-        final int listSize = list.size();
-        final float[] floatArray = new float[listSize];
-        for (int i = 0; i < listSize; i++) {
-            floatArray[i] = Float.parseFloat(list.get(i).replace(",", "."));
-        }
+	/**
+	 * Parses the text under a node and returns it as a float array.
+	 *
+	 * @param node node to parse content from
+	 * @return parsed float array
+	 */
+	public float[] parseFloatArray(final Element node) {
+		if (dataCache.getFloatArrays().containsKey(node)) {
+			return dataCache.getFloatArrays().get(node);
+		}
 
-        GlobalData.getInstance().getFloatArrays().put(node, floatArray);
+		final String content = node.getText();
 
-        return floatArray;
-    }
+		final List<String> list = new ArrayList<String>();
+		final StringTokenizer tokenizer = new StringTokenizer(content, " ");
+		while (tokenizer.hasMoreTokens()) {
+			list.add(tokenizer.nextToken());
+		}
+		final int listSize = list.size();
+		final float[] floatArray = new float[listSize];
+		for (int i = 0; i < listSize; i++) {
+			floatArray[i] = Float.parseFloat(list.get(i).replace(",", "."));
+		}
 
-    /**
-     * Parses the text under a node and returns it as a double array.
-     * 
-     * @param node
-     *            node to parse content from
-     * @return parsed double array
-     */
-    public static double[] parseDoubleArray(final Element node) {
-        if (GlobalData.getInstance().getDoubleArrays().containsKey(node)) {
-            return GlobalData.getInstance().getDoubleArrays().get(node);
-        }
+		dataCache.getFloatArrays().put(node, floatArray);
 
-        final String content = node.getText();
+		return floatArray;
+	}
 
-        final List<String> list = new ArrayList<String>();
-        final StringTokenizer tokenizer = new StringTokenizer(content, " ");
-        while (tokenizer.hasMoreTokens()) {
-            list.add(tokenizer.nextToken());
-        }
-        final int listSize = list.size();
-        final double[] doubleArray = new double[listSize];
-        for (int i = 0; i < listSize; i++) {
-            doubleArray[i] = Double.parseDouble(list.get(i).replace(",", "."));
-        }
+	/**
+	 * Parses the text under a node and returns it as a double array.
+	 *
+	 * @param node node to parse content from
+	 * @return parsed double array
+	 */
+	public double[] parseDoubleArray(final Element node) {
+		if (dataCache.getDoubleArrays().containsKey(node)) {
+			return dataCache.getDoubleArrays().get(node);
+		}
 
-        GlobalData.getInstance().getDoubleArrays().put(node, doubleArray);
+		final String content = node.getText();
 
-        return doubleArray;
-    }
+		final List<String> list = new ArrayList<String>();
+		final StringTokenizer tokenizer = new StringTokenizer(content, " ");
+		while (tokenizer.hasMoreTokens()) {
+			list.add(tokenizer.nextToken());
+		}
+		final int listSize = list.size();
+		final double[] doubleArray = new double[listSize];
+		for (int i = 0; i < listSize; i++) {
+			doubleArray[i] = Double.parseDouble(list.get(i).replace(",", "."));
+		}
 
-    /**
-     * Parses the text under a node and returns it as an int array.
-     * 
-     * @param node
-     *            node to parse content from
-     * @return parsed int array
-     */
-    public static int[] parseIntArray(final Element node) {
-        if (GlobalData.getInstance().getIntArrays().containsKey(node)) {
-            return GlobalData.getInstance().getIntArrays().get(node);
-        }
+		dataCache.getDoubleArrays().put(node, doubleArray);
 
-        final String content = node.getText();
+		return doubleArray;
+	}
 
-        final List<String> list = new ArrayList<String>();
-        final StringTokenizer tokenizer = new StringTokenizer(content, " ");
-        while (tokenizer.hasMoreTokens()) {
-            list.add(tokenizer.nextToken());
-        }
-        final int listSize = list.size();
-        final int[] intArray = new int[listSize];
-        for (int i = 0; i < listSize; i++) {
-            intArray[i] = Integer.parseInt(list.get(i));
-        }
+	/**
+	 * Parses the text under a node and returns it as an int array.
+	 *
+	 * @param node node to parse content from
+	 * @return parsed int array
+	 */
+	public int[] parseIntArray(final Element node) {
+		if (dataCache.getIntArrays().containsKey(node)) {
+			return dataCache.getIntArrays().get(node);
+		}
 
-        GlobalData.getInstance().getIntArrays().put(node, intArray);
+		final String content = node.getText();
 
-        return intArray;
-    }
+		final List<String> list = new ArrayList<String>();
+		final StringTokenizer tokenizer = new StringTokenizer(content, " ");
+		while (tokenizer.hasMoreTokens()) {
+			list.add(tokenizer.nextToken());
+		}
+		final int listSize = list.size();
+		final int[] intArray = new int[listSize];
+		for (int i = 0; i < listSize; i++) {
+			intArray[i] = Integer.parseInt(list.get(i));
+		}
 
-    /**
-     * Parses the text under a node and returns it as a boolean array.
-     * 
-     * @param node
-     *            node to parse content from
-     * @return parsed boolean array
-     */
-    public static boolean[] parseBooleanArray(final Element node) {
-        if (GlobalData.getInstance().getDoubleArrays().containsKey(node)) {
-            return GlobalData.getInstance().getBooleanArrays().get(node);
-        }
+		dataCache.getIntArrays().put(node, intArray);
 
-        final String content = node.getText();
+		return intArray;
+	}
 
-        final List<String> list = new ArrayList<String>();
-        final StringTokenizer tokenizer = new StringTokenizer(content, " ");
-        while (tokenizer.hasMoreTokens()) {
-            list.add(tokenizer.nextToken());
-        }
-        final int listSize = list.size();
-        final boolean[] booleanArray = new boolean[listSize];
-        for (int i = 0; i < listSize; i++) {
-            booleanArray[i] = Boolean.parseBoolean(list.get(i));
-        }
+	/**
+	 * Parses the text under a node and returns it as a boolean array.
+	 *
+	 * @param node node to parse content from
+	 * @return parsed boolean array
+	 */
+	public boolean[] parseBooleanArray(final Element node) {
+		if (dataCache.getDoubleArrays().containsKey(node)) {
+			return dataCache.getBooleanArrays().get(node);
+		}
 
-        GlobalData.getInstance().getBooleanArrays().put(node, booleanArray);
+		final String content = node.getText();
 
-        return booleanArray;
-    }
+		final List<String> list = new ArrayList<String>();
+		final StringTokenizer tokenizer = new StringTokenizer(content, " ");
+		while (tokenizer.hasMoreTokens()) {
+			list.add(tokenizer.nextToken());
+		}
+		final int listSize = list.size();
+		final boolean[] booleanArray = new boolean[listSize];
+		for (int i = 0; i < listSize; i++) {
+			booleanArray[i] = Boolean.parseBoolean(list.get(i));
+		}
 
-    /**
-     * Parses the text under a node and returns it as a string array.
-     * 
-     * @param node
-     *            node to parse content from
-     * @return parsed string array
-     */
-    public static String[] parseStringArray(final Element node) {
-        if (GlobalData.getInstance().getStringArrays().containsKey(node)) {
-            return GlobalData.getInstance().getStringArrays().get(node);
-        }
+		dataCache.getBooleanArrays().put(node, booleanArray);
 
-        final String content = node.getText();
+		return booleanArray;
+	}
 
-        final List<String> list = new ArrayList<String>();
-        final StringTokenizer tokenizer = new StringTokenizer(content, " ");
-        while (tokenizer.hasMoreTokens()) {
-            list.add(tokenizer.nextToken());
-        }
-        final String[] stringArray = list.toArray(new String[list.size()]);
+	/**
+	 * Parses the text under a node and returns it as a string array.
+	 *
+	 * @param node node to parse content from
+	 * @return parsed string array
+	 */
+	public String[] parseStringArray(final Element node) {
+		if (dataCache.getStringArrays().containsKey(node)) {
+			return dataCache.getStringArrays().get(node);
+		}
 
-        GlobalData.getInstance().getStringArrays().put(node, stringArray);
+		final String content = node.getText();
 
-        return stringArray;
-    }
+		final List<String> list = new ArrayList<String>();
+		final StringTokenizer tokenizer = new StringTokenizer(content, " ");
+		while (tokenizer.hasMoreTokens()) {
+			list.add(tokenizer.nextToken());
+		}
+		final String[] stringArray = list.toArray(new String[list.size()]);
 
-    /**
-     * Strips the namespace from all nodes in a tree.
-     * 
-     * @param rootElement
-     *            Root of strip operation
-     */
-    @SuppressWarnings("unchecked")
-    public static void stripNamespace(final Element rootElement) {
-        rootElement.setNamespace(null);
+		dataCache.getStringArrays().put(node, stringArray);
 
-        final List children = rootElement.getChildren();
-        final Iterator i = children.iterator();
-        while (i.hasNext()) {
-            final Element child = (Element) i.next();
-            ColladaDOMUtil.stripNamespace(child);
-        }
-    }
+		return stringArray;
+	}
 
-    /**
-     * Parse an int value in an attribute.
-     * 
-     * @param input
-     *            Element containing the attribute
-     * @param attributeName
-     *            Attribute name to parse a value for
-     * @return parsed integer
-     */
-    public static int getAttributeIntValue(final Element input, final String attributeName, final int defaultVal) {
-        final Attribute attribute = input.getAttribute(attributeName);
-        if (attribute != null) {
-            try {
-                return attribute.getIntValue();
-            } catch (final DataConversionException e) {
-                ColladaDOMUtil.logger.log(Level.WARNING, "Could not parse int value", e);
-            }
-        }
-        return defaultVal;
-    }
+	/**
+	 * Strips the namespace from all nodes in a tree.
+	 *
+	 * @param rootElement Root of strip operation
+	 */
+	@SuppressWarnings("unchecked")
+	public void stripNamespace(final Element rootElement) {
+		rootElement.setNamespace(null);
 
-    /**
-     * Convert a Collada color description into an Ardor3D ColorRGBA
-     * 
-     * @param colorDescription
-     *            Collada color description
-     * @return Ardor3d ColorRGBA
-     */
-    public static ColorRGBA getColor(final String colorDescription) {
-        if (colorDescription == null) {
-            throw new ColladaException("Null color description not allowed", colorDescription);
-        }
+		final List children = rootElement.getChildren();
+		final Iterator i = children.iterator();
+		while (i.hasNext()) {
+			final Element child = (Element) i.next();
+			stripNamespace(child);
+		}
+	}
 
-        final String[] values = GlobalData.getInstance().getPattern().split(colorDescription.replace(",", "."));
+	/**
+	 * Parse an int value in an attribute.
+	 *
+	 * @param input			Element containing the attribute
+	 * @param attributeName Attribute name to parse a value for
+	 * @return parsed integer
+	 */
+	public int getAttributeIntValue(final Element input, final String attributeName, final int defaultVal) {
+		final Attribute attribute = input.getAttribute(attributeName);
+		if (attribute != null) {
+			try {
+				return attribute.getIntValue();
+			} catch (final DataConversionException e) {
+				logger.log(Level.WARNING, "Could not parse int value", e);
+			}
+		}
+		return defaultVal;
+	}
 
-        if (values.length < 3 || values.length > 4) {
-            throw new ColladaException("Expected color definition of length 3 or 4 - got " + values.length
-                    + " for description: " + colorDescription, colorDescription);
-        }
+	/**
+	 * Convert a Collada color description into an Ardor3D ColorRGBA
+	 *
+	 * @param colorDescription Collada color description
+	 * @return Ardor3d ColorRGBA
+	 */
+	public ColorRGBA getColor(final String colorDescription) {
+		if (colorDescription == null) {
+			throw new ColladaException("Null color description not allowed", colorDescription);
+		}
 
-        try {
-            return new ColorRGBA(Float.parseFloat(values[0]), Float.parseFloat(values[1]), Float.parseFloat(values[2]),
-                    values.length == 4 ? Float.parseFloat(values[3]) : 1.0f);
-        } catch (final NumberFormatException e) {
-            throw new ColladaException("Unable to parse float number", colorDescription, e);
-        }
-    }
+		final String[] values = dataCache.getPattern().split(colorDescription.replace(",", "."));
+
+		if (values.length < 3 || values.length > 4) {
+			throw new ColladaException("Expected color definition of length 3 or 4 - got " + values.length
+					+ " for description: " + colorDescription, colorDescription);
+		}
+
+		try {
+			return new ColorRGBA(Float.parseFloat(values[0]), Float.parseFloat(values[1]), Float.parseFloat(values[2]),
+					values.length == 4 ? Float.parseFloat(values[3]) : 1.0f);
+		} catch (final NumberFormatException e) {
+			throw new ColladaException("Unable to parse float number", colorDescription, e);
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	public Element getPositionSource(final Element v) {
+		for (final Element input : (List<Element>) v.getChildren("input")) {
+			if ("POSITION".equals(input.getAttributeValue("semantic"))) {
+				final Element n = findTargetWithId(input.getAttributeValue("source"));
+				if (n != null && "source".equals(n.getName())) {
+					return n;
+				}
+			}
+		}
+
+		// changed this to throw an exception instead - otherwise, there will just be a nullpointer exception
+		// outside. This provides much more information about what went wrong / Petter
+		// return null;
+		throw new ColladaException("Unable to find POSITION semantic for inputs under DaeVertices", v);
+	}
 }

@@ -1,19 +1,13 @@
-/**
- * Copyright (c) 2008-2009 Ardor Labs, Inc.
- *
- * This file is part of Ardor3D.
- *
- * Ardor3D is free software: you can redistribute it and/or modify it 
- * under the terms of its license which may be found in the accompanying
- * LICENSE file or at <http://www.ardor3d.com/LICENSE>.
- */
-
 package com.ardor3d.extension.model.collada.jdom;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.StringTokenizer;
-
+import com.ardor3d.extension.model.collada.jdom.data.AssetData;
+import com.ardor3d.extension.model.collada.jdom.data.ColladaStorage;
+import com.ardor3d.extension.model.collada.jdom.data.DataCache;
+import com.ardor3d.scenegraph.Node;
+import com.ardor3d.util.resource.RelativeResourceLocator;
+import com.ardor3d.util.resource.ResourceLocator;
+import com.ardor3d.util.resource.ResourceLocatorTool;
+import com.ardor3d.util.resource.ResourceSource;
 import org.jdom.Attribute;
 import org.jdom.DataConversionException;
 import org.jdom.DefaultJDOMFactory;
@@ -25,326 +19,301 @@ import org.jdom.input.SAXBuilder;
 import org.jdom.input.SAXHandler;
 import org.xml.sax.SAXException;
 
-import com.ardor3d.extension.model.collada.jdom.data.AssetData;
-import com.ardor3d.extension.model.collada.jdom.data.ColladaOptions;
-import com.ardor3d.extension.model.collada.jdom.data.ColladaStorage;
-import com.ardor3d.extension.model.collada.jdom.data.GlobalData;
-import com.ardor3d.scenegraph.Node;
-import com.ardor3d.util.resource.RelativeResourceLocator;
-import com.ardor3d.util.resource.ResourceLocatorTool;
-import com.ardor3d.util.resource.ResourceSource;
-import com.google.inject.Inject;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.StringTokenizer;
 
 public class ColladaImporter {
+	private boolean loadTextures = true;
+	private ResourceLocator textureLocator;
+	private ResourceLocator modelLocator;
 
-    private ColladaOptions _options;
+	public ColladaImporter loadTextures(boolean loadTextures) {
+		this.loadTextures = loadTextures;
+		return this;
+	}
 
-    /**
-     * Constructs a new ColladaImporter using default option values.
-     */
-    public ColladaImporter() {
-        // Set our default options
-        setOptions(new ColladaOptions());
-    }
+	public ColladaImporter textureLocator(ResourceLocator textureLocator) {
+		this.textureLocator = textureLocator;
+		return this;
+	}
 
-    /**
-     * Constructs a new ColladaImporter using given option values.
-     * 
-     * @param options
-     *            options to use during import
-     */
-    @Inject
-    public ColladaImporter(final ColladaOptions options) {
-        setOptions(options);
-    }
+	public ColladaImporter modelLocator(ResourceLocator modelLocator) {
+		this.modelLocator = modelLocator;
+		return this;
+	}
 
-    /**
-     * Reads a Collada file from the given resource and returns it as a ColladaStorage object.
-     * 
-     * @param resource
-     *            the name of the resource to find. ResourceLocatorTool will be used with TYPE_MODEL to find the
-     *            resource.
-     * @return a ColladaStorage data object containing the Collada scene and other useful elements.
-     */
-    public ColladaStorage readColladaFile(final String resource) {
-        final ResourceSource source;
-        if (!getOptions().hasModelLocator()) {
-            source = ResourceLocatorTool.locateResource(ResourceLocatorTool.TYPE_MODEL, resource);
-        } else {
-            source = getOptions().getModelLocator().locateResource(resource);
-        }
+	public ColladaStorage load(String resource) {
+		final ResourceSource source;
+		if (modelLocator == null) {
+			source = ResourceLocatorTool.locateResource(ResourceLocatorTool.TYPE_MODEL, resource);
+		} else {
+			source = modelLocator.locateResource(resource);
+		}
 
-        if (source == null) {
-            throw new Error("Unable to locate '" + resource + "'");
-        }
+		if (source == null) {
+			throw new Error("Unable to locate '" + resource + "'");
+		}
 
-        return readColladaFile(source);
-    }
+		return load(source);
 
-    /**
-     * Reads a Collada file from the given resource and returns it as a ColladaStorage object.
-     * 
-     * @param resource
-     *            the name of the resource to find.
-     * @return a ColladaStorage data object containing the Collada scene and other useful elements.
-     */
-    public ColladaStorage readColladaFile(final ResourceSource resource) {
-        try {
-            // Inject our options
-            GlobalData.getInstance().setOptions(getOptions());
+	}
 
-            // Pull in the DOM tree of the Collada resource.
-            final Element collada = readCollada(resource);
+	private ColladaStorage load(ResourceSource resource) {
 
-            // if we don't specify a texture locator, add a temporary texture locator at the location of this model
-            // resource..
-            final boolean addLocator = !getOptions().hasTextureLocator();
+		ColladaStorage colladaStorage = new ColladaStorage();
+		DataCache dataCache = new DataCache();
+		ColladaDOMUtil colladaDOMUtil = new ColladaDOMUtil(dataCache);
+		ColladaMaterialUtils colladaMaterialUtils = new ColladaMaterialUtils(loadTextures, dataCache, colladaDOMUtil, textureLocator);
+		ColladaMeshUtils colladaMeshUtils = new ColladaMeshUtils(dataCache, colladaDOMUtil, colladaMaterialUtils);
+		ColladaAnimUtils colladaAnumUtils = new ColladaAnimUtils(colladaStorage, dataCache, colladaDOMUtil, colladaMeshUtils);
+		ColladaNodeUtils colladaNodeUtils = new ColladaNodeUtils(dataCache, colladaDOMUtil, colladaMaterialUtils, colladaMeshUtils, colladaAnumUtils);
 
-            final RelativeResourceLocator loc;
-            if (addLocator) {
-                loc = new RelativeResourceLocator(resource);
-                ResourceLocatorTool.addResourceLocator(ResourceLocatorTool.TYPE_TEXTURE, loc);
-            } else {
-                loc = null;
-            }
+		try {
 
-            final AssetData assetData = ColladaNodeUtils.parseAsset(collada.getChild("asset"));
+			// Pull in the DOM tree of the Collada resource.
+			final Element collada = readCollada(resource, dataCache);
 
-            // Collada may or may not have a scene, so this can return null.
-            final Node scene = ColladaNodeUtils.getVisualScene(collada);
+			// if we don't specify a texture locator, add a temporary texture locator at the location of this model
+			// resource..
+			final boolean addLocator = textureLocator != null;
 
-            // Pull out our storage
-            final ColladaStorage storage = GlobalData.getInstance().getColladaStorage();
+			final RelativeResourceLocator loc;
+			if (addLocator) {
+				loc = new RelativeResourceLocator(resource);
+				ResourceLocatorTool.addResourceLocator(ResourceLocatorTool.TYPE_TEXTURE, loc);
+			} else {
+				loc = null;
+			}
 
-            // set our scene into storage
-            storage.setScene(scene);
+			final AssetData assetData = colladaNodeUtils.parseAsset(collada.getChild("asset"));
 
-            // set our asset data into storage
-            storage.setAssetData(assetData);
+			// Collada may or may not have a scene, so this can return null.
+			final Node scene = colladaNodeUtils.getVisualScene(collada);
 
-            // Drop caches, etc. after import.
-            GlobalData.disposeInstance();
+			// Pull out our storage
 
-            // drop our added locator if needed.
-            if (addLocator) {
-                ResourceLocatorTool.removeResourceLocator(ResourceLocatorTool.TYPE_TEXTURE, loc);
-            }
+			// set our scene into storage
+			colladaStorage.setScene(scene);
 
-            // return storage
-            return storage;
-        } catch (final Exception e) {
-            throw new RuntimeException("Unable to load collada resource from URL: " + resource, e);
-        }
+			// set our asset data into storage
+			colladaStorage.setAssetData(assetData);
 
-    }
 
-    /**
-     * Reads the whole Collada DOM tree from the given resource and returns its root element. Exceptions may be thrown
-     * by underlying tools; these will be wrapped in a RuntimeException and rethrown.
-     * 
-     * @param resource
-     *            the ResourceSource to read the resource from
-     * @return the Collada root element
-     */
-    private Element readCollada(final ResourceSource resource) {
-        try {
-            final SAXBuilder builder = new SAXBuilder() {
-                @Override
-                protected SAXHandler createContentHandler() {
-                    final SAXHandler contentHandler = new SAXHandler(new ArdorFactory()) {
-                        @Override
-                        public void startPrefixMapping(final String prefix, final String uri) throws SAXException {
-                        // Just kill what's usually done here...
-                        }
+			// drop our added locator if needed.
+			if (addLocator) {
+				ResourceLocatorTool.removeResourceLocator(ResourceLocatorTool.TYPE_TEXTURE, loc);
+			}
 
-                    };
-                    return contentHandler;
-                }
-            };
-            //            
-            // final SAXBuilder builder = new SAXBuilder();
-            // builder.setFactory(new ArdorSimpleFactory());
+			// return storage
+			return colladaStorage;
+		} catch (final Exception e) {
+			throw new RuntimeException("Unable to load collada resource from URL: " + resource, e);
+		}
+	}
 
-            final Document doc = builder.build(resource.openStream());
-            final Element collada = doc.getRootElement();
+	private Element readCollada(final ResourceSource resource, final DataCache dataCache) {
+		try {
+			final SAXBuilder builder = new SAXBuilder() {
+				@Override
+				protected SAXHandler createContentHandler() {
+					return new SAXHandler(new ArdorFactory(dataCache)) {
+						@Override
+						public void startPrefixMapping(final String prefix, final String uri) throws SAXException {
+							// Just kill what's usually done here...
+						}
 
-            // ColladaDOMUtil.stripNamespace(collada);
+					};
+				}
+			};
+			//
+			// final SAXBuilder builder = new SAXBuilder();
+			// builder.setFactory(new ArdorSimpleFactory());
 
-            return collada;
-        } catch (final Exception e) {
-            throw new RuntimeException("Unable to load collada resource from source: " + resource, e);
-        }
-    }
+			final Document doc = builder.build(resource.openStream());
+			final Element collada = doc.getRootElement();
 
-    final class ArdorSimpleFactory extends DefaultJDOMFactory {
-        @Override
-        public Text text(final String text) {
-            return new Text(Text.normalizeString(text));
-        }
+			// ColladaDOMUtil.stripNamespace(collada);
 
-        @Override
-        public void setAttribute(final Element parent, final Attribute a) {
-            if ("id".equals(a.getName())) {
-                GlobalData.getInstance().getIdCache().put(a.getValue(), parent);
-            } else if ("sid".equals(a.getName())) {
-                GlobalData.getInstance().getSidCache().put(a.getValue(), parent);
-            }
+			return collada;
+		} catch (final Exception e) {
+			throw new RuntimeException("Unable to load collada resource from source: " + resource, e);
+		}
+	}
 
-            super.setAttribute(parent, a);
-        }
-    }
+	final class ArdorSimpleFactory extends DefaultJDOMFactory {
+		private DataCache dataCache;
 
-    private enum BufferType {
-        None, Float, Double, Int, String, P
-    };
+		ArdorSimpleFactory(DataCache dataCache) {
+			this.dataCache = dataCache;
+		}
 
-    /**
-     * A JDOMFactory that normalizes all text (strips extra whitespace etc)
-     */
-    final class ArdorFactory extends DefaultJDOMFactory {
-        private Element currentElement;
-        private BufferType bufferType = BufferType.None;
-        private int count = 0;
-        private final List<String> list = new ArrayList<String>();
+		@Override
+		public Text text(final String text) {
+			return new Text(Text.normalizeString(text));
+		}
 
-        @Override
-        public Text text(final String text) {
-            switch (bufferType) {
-                case Float: {
-                    final String normalizedText = Text.normalizeString(text);
-                    if (normalizedText.length() == 0) {
-                        return new Text("");
-                    }
-                    final StringTokenizer tokenizer = new StringTokenizer(normalizedText, " ");
-                    final float[] floatArray = new float[count];
-                    for (int i = 0; i < count; i++) {
-                        floatArray[i] = Float.parseFloat(tokenizer.nextToken().replace(",", "."));
-                    }
+		@Override
+		public void setAttribute(final Element parent, final Attribute a) {
+			if ("id".equals(a.getName())) {
+				dataCache.getIdCache().put(a.getValue(), parent);
+			} else if ("sid".equals(a.getName())) {
+				dataCache.getSidCache().put(a.getValue(), parent);
+			}
 
-                    GlobalData.getInstance().getFloatArrays().put(currentElement, floatArray);
+			super.setAttribute(parent, a);
+		}
+	}
 
-                    return new Text("");
-                }
-                case Double: {
-                    final String normalizedText = Text.normalizeString(text);
-                    if (normalizedText.length() == 0) {
-                        return new Text("");
-                    }
-                    final StringTokenizer tokenizer = new StringTokenizer(normalizedText, " ");
-                    final double[] doubleArray = new double[count];
-                    for (int i = 0; i < count; i++) {
-                        doubleArray[i] = Double.parseDouble(tokenizer.nextToken().replace(",", "."));
-                    }
+	private enum BufferType {
+		None, Float, Double, Int, String, P
+	}
 
-                    GlobalData.getInstance().getDoubleArrays().put(currentElement, doubleArray);
 
-                    return new Text("");
-                }
-                case Int: {
-                    final String normalizedText = Text.normalizeString(text);
-                    if (normalizedText.length() == 0) {
-                        return new Text("");
-                    }
-                    final StringTokenizer tokenizer = new StringTokenizer(normalizedText, " ");
-                    final int[] intArray = new int[count];
-                    int i = 0;
-                    while (tokenizer.hasMoreTokens()) {
-                        intArray[i++] = Integer.parseInt(tokenizer.nextToken());
-                    }
+	/**
+	 * A JDOMFactory that normalizes all text (strips extra whitespace etc)
+	 */
+	final class ArdorFactory extends DefaultJDOMFactory {
+		private DataCache dataCache;
+		private Element currentElement;
+		private BufferType bufferType = BufferType.None;
+		private int count = 0;
+		private final List<String> list = new ArrayList<String>();
 
-                    GlobalData.getInstance().getIntArrays().put(currentElement, intArray);
+		ArdorFactory(DataCache dataCache) {
+			this.dataCache = dataCache;
+		}
 
-                    return new Text("");
-                }
-                case P: {
-                    list.clear();
-                    final String normalizedText = Text.normalizeString(text);
-                    if (normalizedText.length() == 0) {
-                        return new Text("");
-                    }
-                    final StringTokenizer tokenizer = new StringTokenizer(normalizedText, " ");
-                    while (tokenizer.hasMoreTokens()) {
-                        list.add(tokenizer.nextToken());
-                    }
-                    final int listSize = list.size();
-                    final int[] intArray = new int[listSize];
-                    for (int i = 0; i < listSize; i++) {
-                        intArray[i] = Integer.parseInt(list.get(i));
-                    }
+		@Override
+		public Text text(final String text) {
+			switch (bufferType) {
+				case Float: {
+					final String normalizedText = Text.normalizeString(text);
+					if (normalizedText.length() == 0) {
+						return new Text("");
+					}
+					final StringTokenizer tokenizer = new StringTokenizer(normalizedText, " ");
+					final float[] floatArray = new float[count];
+					for (int i = 0; i < count; i++) {
+						floatArray[i] = Float.parseFloat(tokenizer.nextToken().replace(",", "."));
+					}
 
-                    GlobalData.getInstance().getIntArrays().put(currentElement, intArray);
+					dataCache.getFloatArrays().put(currentElement, floatArray);
 
-                    return new Text("");
-                }
-            }
-            return new Text(Text.normalizeString(text));
-        }
+					return new Text("");
+				}
+				case Double: {
+					final String normalizedText = Text.normalizeString(text);
+					if (normalizedText.length() == 0) {
+						return new Text("");
+					}
+					final StringTokenizer tokenizer = new StringTokenizer(normalizedText, " ");
+					final double[] doubleArray = new double[count];
+					for (int i = 0; i < count; i++) {
+						doubleArray[i] = Double.parseDouble(tokenizer.nextToken().replace(",", "."));
+					}
 
-        @Override
-        public void setAttribute(final Element parent, final Attribute a) {
-            if ("id".equals(a.getName())) {
-                GlobalData.getInstance().getIdCache().put(a.getValue(), parent);
-            } else if ("sid".equals(a.getName())) {
-                GlobalData.getInstance().getSidCache().put(a.getValue(), parent);
-            } else if ("count".equals(a.getName())) {
-                try {
-                    count = a.getIntValue();
-                } catch (final DataConversionException e) {
-                    e.printStackTrace();
-                }
-            }
+					dataCache.getDoubleArrays().put(currentElement, doubleArray);
 
-            super.setAttribute(parent, a);
-        }
+					return new Text("");
+				}
+				case Int: {
+					final String normalizedText = Text.normalizeString(text);
+					if (normalizedText.length() == 0) {
+						return new Text("");
+					}
+					final StringTokenizer tokenizer = new StringTokenizer(normalizedText, " ");
+					final int[] intArray = new int[count];
+					int i = 0;
+					while (tokenizer.hasMoreTokens()) {
+						intArray[i++] = Integer.parseInt(tokenizer.nextToken());
+					}
 
-        @Override
-        public Element element(final String name, final Namespace namespace) {
-            currentElement = super.element(name);
-            handleTypes(name);
-            return currentElement;
-        }
+					dataCache.getIntArrays().put(currentElement, intArray);
 
-        @Override
-        public Element element(final String name, final String prefix, final String uri) {
-            currentElement = super.element(name);
-            handleTypes(name);
-            return currentElement;
-        }
+					return new Text("");
+				}
+				case P: {
+					list.clear();
+					final String normalizedText = Text.normalizeString(text);
+					if (normalizedText.length() == 0) {
+						return new Text("");
+					}
+					final StringTokenizer tokenizer = new StringTokenizer(normalizedText, " ");
+					while (tokenizer.hasMoreTokens()) {
+						list.add(tokenizer.nextToken());
+					}
+					final int listSize = list.size();
+					final int[] intArray = new int[listSize];
+					for (int i = 0; i < listSize; i++) {
+						intArray[i] = Integer.parseInt(list.get(i));
+					}
 
-        @Override
-        public Element element(final String name, final String uri) {
-            currentElement = super.element(name);
-            handleTypes(name);
-            return currentElement;
-        }
+					dataCache.getIntArrays().put(currentElement, intArray);
 
-        @Override
-        public Element element(final String name) {
-            currentElement = super.element(name);
-            handleTypes(name);
-            return currentElement;
-        }
+					return new Text("");
+				}
+			}
+			return new Text(Text.normalizeString(text));
+		}
 
-        private void handleTypes(final String name) {
-            if ("float_array".equals(name)) {
-                bufferType = BufferType.Float;
-            } else if ("double_array".equals(name)) {
-                bufferType = BufferType.Double;
-            } else if ("int_array".equals(name)) {
-                bufferType = BufferType.Int;
-            } else if ("p".equals(name)) {
-                bufferType = BufferType.P;
-            } else {
-                bufferType = BufferType.None;
-            }
-        }
-    }
+		@Override
+		public void setAttribute(final Element parent, final Attribute a) {
+			if ("id".equals(a.getName())) {
+				dataCache.getIdCache().put(a.getValue(), parent);
+			} else if ("sid".equals(a.getName())) {
+				dataCache.getSidCache().put(a.getValue(), parent);
+			} else if ("count".equals(a.getName())) {
+				try {
+					count = a.getIntValue();
+				} catch (final DataConversionException e) {
+					e.printStackTrace();
+				}
+			}
 
-    public ColladaOptions getOptions() {
-        return _options;
-    }
+			super.setAttribute(parent, a);
+		}
 
-    public void setOptions(final ColladaOptions options) {
-        _options = options;
-    }
+		@Override
+		public Element element(final String name, final Namespace namespace) {
+			currentElement = super.element(name);
+			handleTypes(name);
+			return currentElement;
+		}
+
+		@Override
+		public Element element(final String name, final String prefix, final String uri) {
+			currentElement = super.element(name);
+			handleTypes(name);
+			return currentElement;
+		}
+
+		@Override
+		public Element element(final String name, final String uri) {
+			currentElement = super.element(name);
+			handleTypes(name);
+			return currentElement;
+		}
+
+		@Override
+		public Element element(final String name) {
+			currentElement = super.element(name);
+			handleTypes(name);
+			return currentElement;
+		}
+
+		private void handleTypes(final String name) {
+			if ("float_array".equals(name)) {
+				bufferType = BufferType.Float;
+			} else if ("double_array".equals(name)) {
+				bufferType = BufferType.Double;
+			} else if ("int_array".equals(name)) {
+				bufferType = BufferType.Int;
+			} else if ("p".equals(name)) {
+				bufferType = BufferType.P;
+			} else {
+				bufferType = BufferType.None;
+			}
+		}
+	}
 }

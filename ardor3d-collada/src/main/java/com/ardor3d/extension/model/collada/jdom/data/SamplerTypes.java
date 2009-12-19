@@ -1,80 +1,69 @@
-/**
- * Copyright (c) 2008-2009 Ardor Labs, Inc.
- *
- * This file is part of Ardor3D.
- *
- * Ardor3D is free software: you can redistribute it and/or modify it 
- * under the terms of its license which may be found in the accompanying
- * LICENSE file or at <http://www.ardor3d.com/LICENSE>.
- */
-
 package com.ardor3d.extension.model.collada.jdom.data;
 
-import com.ardor3d.image.Texture.MagnificationFilter;
-import com.ardor3d.image.Texture.MinificationFilter;
-import com.ardor3d.image.Texture.WrapMode;
+import com.ardor3d.image.Texture;
 
-/**
- * Various enum types to be used when parsing <sampler> Collada tags.
- */
-public abstract class SamplerTypes {
+public class SamplerTypes {
+	public enum WrapModeType {
+		WRAP(Texture.WrapMode.Repeat),
+		MIRROR(Texture.WrapMode.MirroredRepeat),
+		CLAMP(Texture.WrapMode.EdgeClamp),
+		BORDER(Texture.WrapMode.BorderClamp),
+		NONE(Texture.WrapMode.BorderClamp);
 
-    /**
-     * Enum matching Collada's texture wrapping modes to Ardor3D's.
-     */
-    public enum WrapModeType {
-        WRAP(WrapMode.Repeat), MIRROR(WrapMode.MirroredRepeat), CLAMP(WrapMode.EdgeClamp), BORDER(WrapMode.BorderClamp), NONE(
-                WrapMode.BorderClamp);
+		final Texture.WrapMode wm;
 
-        final WrapMode _wm;
+		private WrapModeType(final Texture.WrapMode ardorWrapMode) {
+			wm = ardorWrapMode;
+		}
 
-        private WrapModeType(final WrapMode ardorWrapMode) {
-            _wm = ardorWrapMode;
-        }
+		public Texture.WrapMode getArdor3dWrapMode() {
+			return wm;
+		}
+	}
 
-        public WrapMode getArdor3dWrapMode() {
-            return _wm;
-        }
-    }
+	/**
+	 * Enum matching Collada's texture minification modes to Ardor3D's.
+	 */
+	public enum MinFilterType {
+		NONE(Texture.MinificationFilter.NearestNeighborNoMipMaps),
+		NEAREST(Texture.MinificationFilter.NearestNeighborNoMipMaps),
+		LINEAR(Texture.MinificationFilter.BilinearNoMipMaps),
+		NEAREST_MIPMAP_NEAREST(Texture.MinificationFilter.NearestNeighborNearestMipMap),
+		LINEAR_MIPMAP_NEAREST(Texture.MinificationFilter.BilinearNearestMipMap),
+		NEAREST_MIPMAP_LINEAR(Texture.MinificationFilter.NearestNeighborLinearMipMap),
+		LINEAR_MIPMAP_LINEAR(Texture.MinificationFilter.Trilinear);
 
-    /**
-     * Enum matching Collada's texture minification modes to Ardor3D's.
-     */
-    public enum MinFilterType {
-        NONE(MinificationFilter.NearestNeighborNoMipMaps), NEAREST(MinificationFilter.NearestNeighborNoMipMaps), LINEAR(
-                MinificationFilter.BilinearNoMipMaps), NEAREST_MIPMAP_NEAREST(
-                MinificationFilter.NearestNeighborNearestMipMap), LINEAR_MIPMAP_NEAREST(
-                MinificationFilter.BilinearNearestMipMap), NEAREST_MIPMAP_LINEAR(
-                MinificationFilter.NearestNeighborLinearMipMap), LINEAR_MIPMAP_LINEAR(MinificationFilter.Trilinear);
+		final Texture.MinificationFilter mf;
 
-        final MinificationFilter _mf;
+		private MinFilterType(final Texture.MinificationFilter ardorFilter) {
+			mf = ardorFilter;
+		}
 
-        private MinFilterType(final MinificationFilter ardorFilter) {
-            _mf = ardorFilter;
-        }
+		public Texture.MinificationFilter getArdor3dFilter() {
+			return mf;
+		}
+	}
 
-        public MinificationFilter getArdor3dFilter() {
-            return _mf;
-        }
-    }
+	/**
+	 * Enum matching Collada's texture magnification modes to Ardor3D's.
+	 */
+	public enum MagFilterType {
+		NONE(Texture.MagnificationFilter.NearestNeighbor),
+		NEAREST(Texture.MagnificationFilter.NearestNeighbor),
+		LINEAR(Texture.MagnificationFilter.Bilinear),
+		NEAREST_MIPMAP_NEAREST(Texture.MagnificationFilter.NearestNeighbor),
+		LINEAR_MIPMAP_NEAREST(Texture.MagnificationFilter.Bilinear),
+		NEAREST_MIPMAP_LINEAR(Texture.MagnificationFilter.NearestNeighbor),
+		LINEAR_MIPMAP_LINEAR(Texture.MagnificationFilter.Bilinear);
 
-    /**
-     * Enum matching Collada's texture magnification modes to Ardor3D's.
-     */
-    public enum MagFilterType {
-        NONE(MagnificationFilter.NearestNeighbor), NEAREST(MagnificationFilter.NearestNeighbor), LINEAR(
-                MagnificationFilter.Bilinear), NEAREST_MIPMAP_NEAREST(MagnificationFilter.NearestNeighbor), LINEAR_MIPMAP_NEAREST(
-                MagnificationFilter.Bilinear), NEAREST_MIPMAP_LINEAR(MagnificationFilter.NearestNeighbor), LINEAR_MIPMAP_LINEAR(
-                MagnificationFilter.Bilinear);
+		final Texture.MagnificationFilter mf;
 
-        final MagnificationFilter _mf;
+		private MagFilterType(final Texture.MagnificationFilter ardorFilter) {
+			mf = ardorFilter;
+		}
 
-        private MagFilterType(final MagnificationFilter ardorFilter) {
-            _mf = ardorFilter;
-        }
-
-        public MagnificationFilter getArdor3dFilter() {
-            return _mf;
-        }
-    }
+		public Texture.MagnificationFilter getArdor3dFilter() {
+			return mf;
+		}
+	}
 }
